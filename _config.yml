@@ -1,9 +1,9 @@
-title: Hacker-Blog
-description: "A Jekyll Blog Theme For Hackers"
+title: "개발 md"
+description: "풀스택 초보 개발일지"
 author:
-  name: "SomeHacker"
-  email: "someone@somewebsite.somedomain"
-  url: "https://ashishchaudhary.in/hacker-blog"
+  name: "Heo-Jae-Won"
+  email: "ckdwhgood2@naver.com"
+  url: "https://ckdwhgood2.github.io"
 
 baseurl: /
 
