@@ -3,4 +3,4 @@ layout: page
 title: About
 ---
 
-Something about me.
+풀스택 초보의 개발일지
