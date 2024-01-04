@@ -1,3 +1,8 @@
+---
+title: Linux Command
+published: true
+---
+
 ```shell
 ls -lt #최근 갱신된 파일을 상세하게
 ``` 
