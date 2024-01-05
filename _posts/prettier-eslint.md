@@ -1,4 +1,9 @@
-- 오늘 자꾸 prettier를 설정한 이후 오류가 났다.
+---
+title: prettier & esLint 설정법
+published: true
+---
+
+- prettier를 설정한 이후 오류가 났다.
   - 자꾸 const가 initialize가 안된다.
   - declare module에서 semi colon을 찾는 오류가 난다.
 -  이렇게 시간을 날려버렸다.
