@@ -1,6 +1,16 @@
 ---
 title: prettier & esLint 설정법
 published: true
+categories:
+  - Eslint
+tags:
+  - Eslint
+
+toc: true
+toc_sticky: true
+ 
+date: 2024-01-05
+last_modified_at: 2024-01-05
 ---
 
 - prettier를 설정한 이후 오류가 났다.
@@ -119,8 +129,4 @@ https://eslint.org/docs/latest/rules/
   "tabWidth": 2
 }
 ```
-- 저장 시에 자동으로 파일들을 prettier 규칙에 맞게 바꾸고 싶다면 아래와 같은 방법으로 설정해줄 수 있다.
-- 잘 적용이 됐나 보기 위해 ''로 string 처리한 것을 ""로 바꾸고 저장을 눌러보자. 
-- 그럼 저절로 ''로 변환되면서 저장됨을 확인할 수 있다. 
-- 나는 tabWidth도 10으로 바꿔놔서 아래와 같이 tab이 어마어마하게 늘어났다. 
 
