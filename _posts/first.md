@@ -1,3 +1,8 @@
+---
+title: Linux Command
+published: true
+---
+
 ## <span style="color:#802548">_network_</span>
 - network란 컴퓨터나 기기들이 데이터를 받기위해 유선/무선으로 연결된 통신 체계를 의미한다.
 - 범위에 따른 분류로는 보통 LAN과 WAN, 공개여부에 따른 분류로는 인트라넷과 인터넷이 있다.
