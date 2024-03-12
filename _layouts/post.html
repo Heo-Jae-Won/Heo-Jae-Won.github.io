@@ -15,7 +15,7 @@ layout: default
     -->
     <aside class="sidebar__right sticky" style="height: auto !important;">
     <div class="toc">
-      <a id="home">홈으로</a>
+      <a href="/">홈으로</a>
       {% include toc.html html=content sanitize=true h_min=1 h_max=2 %}
     </div>
     </aside>
@@ -24,11 +24,3 @@ layout: default
     {{ content }}
     </div>
 </article>
-
-<script>
-const homeElement = document.querySelector("#home");
-  homeElement.addEventListener('click',() => {
-    location.href="/";
-  })
-
-</script>
