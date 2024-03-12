@@ -361,4 +361,4 @@ PDU: bit
 
 
 ## <span style="color:#802548">_주요 출처_</span>
-- https://www.youtube.com/watch?v=oFKYzp6gGfc&list=PLcXyemr8ZeoSGlzhlw4gmpNGicIL4kMcX
+- https://www.youtube.com/watch?v=oFKYzp6gGfc&list=PLcXyemr8ZeoSGlzhlw4gmpNGicIL4kMcX (유튜브 쉬운코드)
