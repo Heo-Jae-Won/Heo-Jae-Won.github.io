@@ -1,16 +1,6 @@
 ---
 title: prettier & esLint 설정법
 published: true
-categories:
-  - Eslint
-tags:
-  - Eslint
-
-toc: true
-toc_sticky: true
- 
-date: 2024-01-05
-last_modified_at: 2024-01-05
 ---
 
 - prettier를 설정한 이후 오류가 났다.
