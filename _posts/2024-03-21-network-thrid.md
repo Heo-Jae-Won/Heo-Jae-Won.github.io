@@ -23,6 +23,9 @@ published: true
   - 차후 request부터 계속 cookie가 header에 담겨감.(browser에 의해 자동으로)
 
 - client-side cookie creation. js다.
+
+
+
 ```js
 function setCookie(name, value, days) {
     var expires = "";
@@ -39,6 +42,9 @@ setCookie("username", "john_doe", 1);
 ```
 
 - server-side cookie creation. java다.
+
+
+
 ```java
 @GetMapping("/set-cookie")
     public String setCookie(HttpServletResponse response) {
@@ -156,6 +162,9 @@ setCookie("username", "john_doe", 1);
   - preflight는 status Code가 중요하지 않다. browser가 origin header와 acess-control-allow-origin header가 같은지만 따진다.
   - header에 *를 넣으면 모든 origin이 허용되게 되기 때문에 개발은 편하지만, 보안상 좋지 않다.
     - Spring에서는 별도의 CorsConfig를 만들지 않으면 *처리되어 모든 origin을 허용한다.
+
+
+
 ```java
 @Configuration
 @Slf4j
@@ -205,6 +214,9 @@ public class CorsConfig {
 
 
 - referrer 검증을 Java소스코드로 쓰면 아래와 같다.
+
+
+
 ```java
 public class ReferrerCheck implements HandlerInterceptor {
     @Override
@@ -221,6 +233,9 @@ public class ReferrerCheck implements HandlerInterceptor {
 ```
 
 - csrf토큰을 Java소스코드로 쓰면 아래와 같다.
+
+
+
 ```java
 session.setAttribute("CSRF_TOKEN", UUID.randomUUID().toString());
 
@@ -365,6 +380,9 @@ element.onevent
 - 그 다음은 CSP 헤더 설정이다.
 - script-src는 엄격하지 않은 정책이라 nonce나 hash를 쓰는 걸 구글은 추천하고 있다.
 - 이쪽은 잘 모르겠다. 써본적이 없어서..
+
+
+
 ```html
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; ">
 ```
@@ -405,6 +423,9 @@ function filterNotAcceptedText(text) {
 - 에러메시지에서 db 구조를 유추할 수 없게끔 에러메시지를 정제하는 작업도 필요하다.
 - Spring의 경우, JPA든 Mybatis든 JDBC를 이용해 아래와 같이 bind variable의 조합으로 이뤄지는 편이다.
 - 따라서 SQL INJECTION 대비를 개발자가 많이 신경쓰지 않아도 된다.
+
+
+
 ```java
  String sql = "INSERT INTO mytable (column1, column2) VALUES (?, ?)";
 
@@ -431,6 +452,9 @@ try (
 
 
 - Express.js에서도 대부분 아래와 같은 bind variable을 지원한다.
+
+
+
 ```js
 app.get('/users/:username/:password', (req, res) => {
   const { username, password } = req.params;
@@ -451,6 +475,9 @@ app.get('/users/:username/:password', (req, res) => {
 - 이러면 보안 상으로 문제다. ' or 1=1 같은 무적의 치트키 조건문으로 원하는 정보를 다 뺴올 수 있다.
 - 또한 Oracle 같은 경우는 SGA의 lib cache에 SQL 자체가 저장되는데, bind variable을 쓰면 딱 한번의 하드파싱으로 SQL을 계속 쓴다.
 - 하지만 아래와 같이 bind variable을 쓰지 않으면 SQL문 자체가 lib cache에 저장되므로 username과 password가 바뀔 떄마다 매번 하드파싱이 필요하여 CPU 부족 문제가 대두될 수 있다.
+
+
+
 ```js
 const express = require('express');
 const mysql = require('mysql');
@@ -573,6 +600,9 @@ app.get('/users/:username/:password', (req, res) => {
 - nginx는 L4와 L7 모두 기능할 수 있다. conf를 어떻게 쓰느냐에 따라 달라진다.
 
 - 아래는 L4 loadbalancer로 쓴 것이다.
+
+
+
 ```sh
 # Define upstream servers
 upstream backend_servers {
@@ -594,6 +624,9 @@ server {
 
 - 아래는 L7 loadbalancer로 쓴 것이다.
 - 헤더값 혹은 uri값을 보고 ngnix가 reverse proxy로서 request를 해당 WAS로 forwarding시킨다.
+
+
+
 ```sh
 # Define upstream servers
 upstream backend_servers_a {
@@ -635,6 +668,8 @@ server {
   - Random
     - 트래픽을 무작위로 분배한다.
 
+
+
 ```sh
 upstream samplecluster {
   least_conn;
@@ -646,6 +681,9 @@ upstream samplecluster {
 
 - upstream directive 없이 바로 server directive로 시작하는 경우 알고리즘을 지정할 수 없다. 
 - 그냥 순서대로 뿌려주는 RR이 선택된다.
+
+
+
 ```sh
 server {
     listen 80;
@@ -697,6 +735,9 @@ server {
 
 - 프론트에서 axios를 활용한다면 아래와 같이 interceptor를 활용해 비교적 쉽게 짤 수 있다.
 - 아래는 request interceptor다. response interceptor도 찾아보면 예시가 많이 있다.
+
+
+
 ```js
 export const instance = axios.create({
   timeout: 10 * 1000,
@@ -724,6 +765,9 @@ instance.interceptors.request.use(
 - 따라서 refreshToken으로 accessToken을 새로 받는 로그인 연장의 경우에만, 인증서버로 request를 날리게끔 해야 한다.
 - 따라서 response interceptor에서 baseURL이 다른 axiosRequestConfig 객체를 따로 만들어야 한다.
 - 물론 많은 경우 localStorage 자체를 이용하기보단 store를 이용하게 된다.
+
+
+
 ```js
 instance.interceptors.response.use(
   response => {
@@ -753,14 +797,14 @@ instance.interceptors.response.use(
 ```
 
 ## <span style="color:#802548">_출처_</span> 
-https://jaeseongdev.github.io/development/2021/06/15/REST%EC%9D%98-%EA%B8%B0%EB%B3%B8-%EC%9B%90%EC%B9%99-6%EA%B0%80%EC%A7%80/ - RESTFUL api
-https://www.bugbountyclub.com/pentestgym/view/47 - csrf 
-https://devscb.tistory.com/123 - csrf
-https://junhyunny.github.io/information/security/spring-mvc/reflected-cross-site-scripting/ - xss
-https://portswigger.net/web-security/cross-site-scripting/dom-based - xss
-https://developer.chrome.com/docs/lighthouse/best-practices/csp-xss?hl=ko - csp
-https://www.mois.go.kr/synap/skin/doc.html?fn=BBS_201405271120475982&rs=/synapFile/202403/&synapUrl=%2Fsynap%2Fskin%2Fdoc.html%3Ffn%3DBBS_201405271120475982%26rs%3D%2FsynapFile%2F202403%2F&synapMessage=%EC%A0%95%EC%83%81 - 정부의 secure java coding
-https://velog.io/@citron03/%EC%9B%B9-%EC%BA%90%EC%8B%9C-WEB-Cache-%EC%A0%95%EB%A6%AC - 웹 캐시
-https://www.youtube.com/watch?v=JqCgJI-Nk88 - 프록시, 리버스 프록시, 포워드 프록시
-https://aws-hyoh.tistory.com/m/149 - 로드밸런서 스위치
-https://alden-kang.tistory.com/m/20#:~:text=%EB%A8%BC%EC%A0%80%20Connection%20Timeout%EC%9D%80%20%EC%A2%85%EB%8B%A8,%EC%82%AC%EC%9A%A9%EB%90%98%EB%8A%94%20%ED%83%80%EC%9E%84%EC%95%84%EC%9B%83%20%EC%9E%85%EB%8B%88%EB%8B%A4 - connection/read timeout
+- https://jaeseongdev.github.io/development/2021/06/15/REST%EC%9D%98-%EA%B8%B0%EB%B3%B8-%EC%9B%90%EC%B9%99-6%EA%B0%80%EC%A7%80/ - RESTFUL api
+- https://www.bugbountyclub.com/pentestgym/view/47 - csrf 
+- https://devscb.tistory.com/123 - csrf
+- https://junhyunny.github.io/information/security/spring-mvc/reflected-cross-site-scripting/ - xss
+- https://portswigger.net/web-security/cross-site-scripting/dom-based - xss
+- https://developer.chrome.com/docs/lighthouse/best-practices/csp-xss?hl=ko - csp
+- https://www.mois.go.kr/synap/skin/doc.html?fn=BBS_201405271120475982&rs=/synapFile/202403/&synapUrl=%2Fsynap%2Fskin%2Fdoc.html%3Ffn%3DBBS_201405271120475982%26rs%3D%2FsynapFile%2F202403%2F&synapMessage=%EC%A0%95%EC%83%81 - 정부의 secure java coding
+- https://velog.io/@citron03/%EC%9B%B9-%EC%BA%90%EC%8B%9C-WEB-Cache-%EC%A0%95%EB%A6%AC - 웹 캐시
+- https://www.youtube.com/watch?v=JqCgJI-Nk88 - 프록시, 리버스 프록시, 포워드 프록시
+- https://aws-hyoh.tistory.com/m/149 - 로드밸런서 스위치
+- https://alden-kang.tistory.com/m/20#:~:text=%EB%A8%BC%EC%A0%80%20Connection%20Timeout%EC%9D%80%20%EC%A2%85%EB%8B%A8,%EC%82%AC%EC%9A%A9%EB%90%98%EB%8A%94%20%ED%83%80%EC%9E%84%EC%95%84%EC%9B%83%20%EC%9E%85%EB%8B%88%EB%8B%A4 - connection/read timeout
