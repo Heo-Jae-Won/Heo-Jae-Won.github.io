@@ -1,3 +1,8 @@
+---
+title: Network fourth week
+published: true
+---
+
 ## <span style="color:#802548">_TCP 프로토콜_</span>
 - 연결성과 신뢰성 있는 데이터 전송 프로토콜이다.
 - UDP와 달리 연결을 맺고 끊는 과정이 존재한다.
