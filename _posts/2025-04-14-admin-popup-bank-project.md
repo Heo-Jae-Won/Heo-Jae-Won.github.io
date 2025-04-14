@@ -1,7 +1,11 @@
 ---
-title: advancement of bank's card application
+layout: post
+title: "Advancement of Bank's Card Application"
+date: 2025-04-14 00:00:00 +0900
 published: true
+categories: [project]
 ---
+
 
 
 
