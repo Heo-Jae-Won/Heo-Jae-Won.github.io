@@ -1,5 +1,5 @@
 ---
-title: カードアプリの高度化 
+title: advancement of bank's card application
 published: true
 ---
 
