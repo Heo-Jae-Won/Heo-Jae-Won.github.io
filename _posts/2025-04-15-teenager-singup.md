@@ -1,5 +1,7 @@
-# 2025-04-11-teenager-singup-nh-japan
-
+---
+title: "teenager-card-issuing"
+published: true
+---
 ## <span style="color:#802548">_ジックナンバー脱皮_</span>
 
 - if文で値を受け取って条件に合わせて分岐処理する場合、下記のような形になります。
