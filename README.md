@@ -1,9 +1,12 @@
-# 허재원의 블로그
+# HEO JAEWON's blog
 
-풀스택 초보일지
 
-사이트
+開発が好きな人
+I like development
+개발이 좋은 사람
+
+site
 https://heo-jae-won.github.io/
 
 
-참조 thema: https://github.com/tocttou/hacker-blog
+thema: https://github.com/tocttou/hacker-blog
