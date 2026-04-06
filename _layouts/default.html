@@ -5,6 +5,30 @@
 <body>
   <div id="wrapper">
     {% include header.html %}
+    <aside class="sidebar__left sticky">
+      <div class="side_toc">
+        <a href="/">home</a>
+
+        <hr>
+        {% assign sorted_categories = site.categories | sort %}
+
+        {% for category in sorted_categories %}
+        <div class="category-block">
+          <strong>{{ category[0] }}</strong>
+          <ul>
+            {% for post in category[1] limit:5 %}
+            <li>
+              <a href="{{ post.url | relative_url }}">
+                {{ post.title }}
+              </a>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endfor %}
+
+      </div>
+    </aside>
     <div class="container">
       <section id="main_content">
         {{ content }}
@@ -17,7 +41,8 @@
     {% if paginator.previous_page == 1 %}
     <a href="{{ '/' | prepend: site.baseurl | replace: '//', '/' }}" class="page-item">&laquo;</a>
     {% elsif paginator.previous_page%}
-    <a href="{{ paginator.previous_page_path | prepend: site.baseurl | replace: '//', '/' }}" class="page-item">&laquo;</a>
+    <a href="{{ paginator.previous_page_path | prepend: site.baseurl | replace: '//', '/' }}"
+      class="page-item">&laquo;</a>
     {% else %}
     <span class="page-item">&laquo;</span>
     {% endif %} {% for page in (1..paginator.total_pages) %} {% if page == paginator.page %}
@@ -25,7 +50,8 @@
     {% elsif page == 1 %}
     <a href="{{ '/' | prepend: site.baseurl | replace: '//', '/' }}" class="page-item">{{ page }}</a>
     {% else %}
-    <a href="{{ site.paginate_path | prepend: site.baseurl | replace: '//', '/' | replace: ':num', page }}" class="page-item">{{ page }}</a>
+    <a href="{{ site.paginate_path | prepend: site.baseurl | replace: '//', '/' | replace: ':num', page }}"
+      class="page-item">{{ page }}</a>
     {% endif %} {% endfor %} {% if paginator.next_page %}
     <a href="{{ paginator.next_page_path | prepend: site.baseurl | replace: '//', '/' }}" class="page-item">&raquo;</a>
     {% else %}
@@ -35,7 +61,7 @@
   {% endif %} {% include footer.html %}
 
   {% if site.google_analytics %}
-    {% include analytics.html %}
+  {% include analytics.html %}
   {% endif %}
 </body>
 
