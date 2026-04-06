@@ -1,6 +1,7 @@
 ---
 title: "recipe-community-project"
 published: true
+categories: [project]
 ---
 
 ## <span style="color:#802548">_GITガイダンス作成_</span>

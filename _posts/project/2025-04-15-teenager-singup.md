@@ -1,6 +1,7 @@
 ---
 title: "teenager-card-issuing"
 published: true
+categories: [project]
 ---
 ## <span style="color:#802548">_ジックナンバー脱皮_</span>
 

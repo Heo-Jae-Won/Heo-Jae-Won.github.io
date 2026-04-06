@@ -1,6 +1,8 @@
 ---
 title: "Advancement of Bank's Card Application"
 published: true
+categories: [project]
+categories: [project]
 ---
 
 

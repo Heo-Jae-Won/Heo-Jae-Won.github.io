@@ -1,6 +1,7 @@
 ---
 title: "pet-card maker program"
 published: true
+categories: [project]
 ---
 
 
