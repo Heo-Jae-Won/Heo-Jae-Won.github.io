@@ -1,6 +1,7 @@
 ---
 title: Network Third week
 published: true
+categories: [network]
 ---
 
 ## <span style="color:#802548">_쿠키, 세션_</span> 

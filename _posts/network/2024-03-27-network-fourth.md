@@ -1,6 +1,7 @@
 ---
 title: Network fourth week
 published: true
+categories: [network]
 ---
 
 ## <span style="color:#802548">_TCP 프로토콜_</span>

@@ -1,6 +1,7 @@
 ---
 title: Network first week
 published: true
+categories: [network]
 ---
 
 

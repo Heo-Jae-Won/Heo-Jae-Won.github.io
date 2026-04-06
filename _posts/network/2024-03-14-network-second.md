@@ -1,6 +1,7 @@
 ---
 title: Network Second week
 published: true
+categories: [network]
 ---
 
 

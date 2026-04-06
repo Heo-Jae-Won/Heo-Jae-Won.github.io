@@ -1,6 +1,7 @@
 ---
 title: Network fifth week
 published: true
+categories: [network]
 ---
 
 ## <span style="color:#802548">_IP_</span>

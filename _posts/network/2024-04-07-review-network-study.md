@@ -1,6 +1,7 @@
 ---
 title: Network Study Review
 published: true
+categories: [network]
 ---
 
 ## <span style="color:#802548">_지원 동기_</span>
