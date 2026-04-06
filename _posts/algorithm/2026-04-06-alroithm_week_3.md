@@ -1,3 +1,9 @@
+---
+title: バブルソートと挿入ソート
+published: true
+categories: [algorithm]
+---
+
 ## <span style="color:#802548">_実装ーバブルソート_</span>
 
 - 最初のロジックは以下だった。

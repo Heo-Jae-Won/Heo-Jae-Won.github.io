@@ -1,3 +1,9 @@
+---
+title: 再帰
+published: true
+categories: [algorithm]
+---
+
 ## <span style="color:#802548">_再帰_</span>
 - 再帰
     - ベースケース
