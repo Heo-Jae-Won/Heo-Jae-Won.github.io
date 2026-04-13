@@ -251,50 +251,6 @@ func SelectionSort(arr []int) []int {
 ```
 
 
-
-
-## <span style="color:#802548">_振り返り_</span>
-- ダブルFor文でｊの値をどう設定していけばいいのかわかなかった
-
-```java
-//最初
-for (int i = 0; i < abc.length; i++) {
-    for (int j = 1/*ここどうすればいい？ */; j < abc.length; j++) {
-
-    }
-}
-
-//AI参考
-for (int i = 0; i < abc.length; i++) {
-    for (int j = 1 + i; j < abc.length; j++) {
-
-    }
-}
-```
-
-- 位置を入れ替えるためには、Indexが必要だったのにそれに気づかなかった
-
-```java
-//最初
-int maxValue = sortedArray[0];
-for (int i = 0; i < sortedArray.length; i++) {
-    for (int j = 1 + i; j < sortedArray.length; j++) {
-        if (sortedArray[maxValueIdx] <= sortedArray[j]) {
-            maxValue = sortedArray[j];
-        }
-    }
-}
-
-//AI参考
-int maxValueIdx = sortedArray[0];
-for (int i = 0; i < sortedArray.length; i++) {
-    for (int j = 1 + i; j < sortedArray.length; j++) {
-        if (sortedArray[maxValueIdx] <= sortedArray[j]) {
-            maxValueIdx = j;
-        }
-    }
-```
-
 ## <span style="color:#802548">_深く探求ー文字列を反転させる_</span>
 
 - １週目は数字を反転させた
@@ -403,3 +359,47 @@ func ReverseString1(s string) string {
 
 
 
+
+
+
+## <span style="color:#802548">_振り返り_</span>
+- ダブルFor文でｊの値をどう設定していけばいいのかわかなかった
+
+```java
+//最初
+for (int i = 0; i < abc.length; i++) {
+    for (int j = 1/*ここどうすればいい？ */; j < abc.length; j++) {
+
+    }
+}
+
+//AI参考
+for (int i = 0; i < abc.length; i++) {
+    for (int j = 1 + i; j < abc.length; j++) {
+
+    }
+}
+```
+
+- 位置を入れ替えるためには、Indexが必要だったのにそれに気づかなかった
+
+```java
+//最初
+int maxValue = sortedArray[0];
+for (int i = 0; i < sortedArray.length; i++) {
+    for (int j = 1 + i; j < sortedArray.length; j++) {
+        if (sortedArray[maxValueIdx] <= sortedArray[j]) {
+            maxValue = sortedArray[j];
+        }
+    }
+}
+
+//AI参考
+int maxValueIdx = sortedArray[0];
+for (int i = 0; i < sortedArray.length; i++) {
+    for (int j = 1 + i; j < sortedArray.length; j++) {
+        if (sortedArray[maxValueIdx] <= sortedArray[j]) {
+            maxValueIdx = j;
+        }
+    }
+```
