@@ -458,7 +458,12 @@ int pivot = arr[low + rand() % (high - low + 1)];
 ## <span style="color:#802548">_深く探究ークイックソート３Way_</span>
 
 - Hoare, Lomutoでは重複された値が多いとき、最悪のケースに陥りやすい
+- 3wayはピボットが最後でなく、最初から始める
 - 重複の値をきちんと扱うため、領域を３つに分ける
+    - lt (less-than boundary)
+    - i (current index)：
+    - gt (greater-than boundary)
+- lomutoとは違って、ピボットが 1 から始まるので、
 
 ```java
 public static void quickSort3Way(int[] arr, int low, int high) {
@@ -468,25 +473,63 @@ public static void quickSort3Way(int[] arr, int low, int high) {
     int lt = low;      // < ピボット
     int i = low + 1;   // ピボット
     int gt = high;     // > ピボット
-
-    while (i <= gt) {
-        if (arr[i] < pivot) {
-            swap(arr, lt++, i++);
-        } else if (arr[i] > pivot) {
-            swap(arr, i, gt--);
-        } else {
-            i++;
-        }
-    }
-
-    quickSort3Way(arr, low, lt - 1);
-    quickSort3Way(arr, gt + 1, high);
 }
+```
+
+- 最初は以下のような状態
+
+```text
+[ P | ? ? ? ? ? ]
+      ↑ 未知
+```
+
+- どんどん動きながら、以下のように未知の領域を減らす
+
+```text
+[ < | = = | ? ? | > ]
+              ↑ shrinking
+```
+
+
+- そのためのロジックは以下の通り
+    - 小さい値があったら、値をスワップする
+        - スワップしたら、左から未知領域が縮めるので、ltを++する
+        - スワップされたら、整頓されたので、現在のインデックス i を次のインデックスに安全に進める 
+    - 大きい値があったら、値をスワップする
+        - スワップしたら、右から未知領域が縮めるので、gtを--する
+        - スワップしても、i は動かないが、理由はまだ右からピボットに向けてきてるインデックスはチェックされてないからだ
+    - どちらにも当てはまらなかった場合、重複なので、インデックスをスキップする
+
+```java
+while (i <= gt) {
+    if (arr[i] < pivot) {
+        swap(arr, lt++, i++);
+    } else if (arr[i] > pivot) {
+        swap(arr, i, gt--);
+    } else {
+        i++;
+    }
+}
+```
+
+- lt がピボットの領域、つまり重複の領域なので、 lt - 1までにすると、小さい値の領域になる
+- gt もピボットの領域、つまり重複の領域なので、gt + 1からすると、大きい値の領域になる
+- クイックソートの作業をもう１度繰り返す
+
+```java
+quickSort3Way(arr, low, lt - 1);
+quickSort3Way(arr, gt + 1, high);
 ```
 
 ## <span style="color:#802548">_深く探究ークイックソートハイブリッド_</span>
 
-- 
+- ハイブリットのクイックソートは以下のようになる
+    - サイズが少ない場合は、挿入ソートが効率高いので、挿入ソートを行う
+    - 少なくない場合、クイックソートを行う
+    - ピボットは３点中央値で最悪のケースに陥る可能性を減らす
+        - 重複値が多い場合、３way方法で進める
+        - でなければ、Hoare方法で進める
+
 
 ```java
 public class HybridQuickSort {
@@ -602,12 +645,8 @@ public class HybridQuickSort {
 ## <span style="color:#802548">_深く探究クイックソートダブルピボット_</span>
 
 - 実際Javaでは、上のようなクイックソートじゃなく、ダブルピボットで基本型のデータをソートするアルゴリズムを実装してる
-
-
-
-ただ、重複が多かったりすると、ハイブリッドが早くなる
-
-- 자바의 quick sort는 dobule pivot
+- 領域を作るロジック事態は3wayと同じ
+- しかし、ダブルピボットになるため、領域を決めるWhile文以前の前処理と以後の後処理が違う
 
 ```java
 public class DualPivotQuickSort {
@@ -663,30 +702,97 @@ public class DualPivotQuickSort {
 }
 ```
 
-⚡ Why dual-pivot is fast in practice
-1. Better partition balance
-1 pivot → 2 parts
-2 pivots → 3 parts
+- まず、小さいピボットと大きいピボットを決める
+- そのあと、ピボットを除いて慮域を設定する
+- 慮域の探索のための i は ピボットを除いた先頭から始まる
 
-👉 recursion depth becomes smaller
+```java
+// Ensure pivot1 <= pivot2
+if (arr[low] > arr[high]) {
+    swap(arr, low, high);
+}
 
-2. Cache efficiency
-Sequential scans
-Fewer recursive layers
-3. Fewer comparisons (on average)
+int pivot1 = arr[low];
+int pivot2 = arr[high];
 
-Even though it looks more complex,
-👉 it reduces total comparisons in real workloads
+int lt = low + 1;   // boundary for < pivot1
+int gt = high - 1;  // boundary for > pivot2
+int i = lt;
+```
+
+- 領域を決めるロジックは３Wayと変わらない
+
+```java
+while (i <= gt) {
+    if (arr[i] < pivot1) {
+        swap(arr, i, lt);
+        lt++;
+        i++;
+    } else if (arr[i] > pivot2) {
+        swap(arr, i, gt);
+        gt--;
+    } else {
+        i++;
+    }
+}
+```
 
 
+- While文が終わった後では、lt と gtはピボットの中間の領域の境界値
+    - lt は --して、境界値の直前の値にする
+    - gt は ++して、境界値の直後の値にする
+- ピボットが配置されべきのインデックスである lt と gtに調整が終わったので、スワップする
 
-## <span style="color:#802548">_クイックソート降順_</span>
+
+```java
+lt--;
+gt++;
+
+swap(arr, low, lt);
+swap(arr, high, gt);
+```
+
+- そうすることで、以下の通りになる
+
+```text
+[ < pivot1 | pivot1 | middle | pivot2 | > pivot2 ]
+```
 
 
+- 小さい領域、中間領域、大きい領域に分けて１度クイックソートを行う
+    - low から lt-1
+        - 1番目のピボットより小さい要素の集まり
+    - lt+1 から gt-1
+        - 1番目のピボットと2番目のピボットの間の要素の集まり
+    - gt+1 から high
+        - ２番目のピボットより大きい要素の集まり
+    - lt と gt はピボットであるため、ソート範囲には含まれない。
+
+```java
+quickSort(arr, low, lt - 1);     // < pivot1
+quickSort(arr, lt + 1, gt - 1);  // between
+quickSort(arr, gt + 1, high);    // > pivot2
+```
 
 
+- ダブルピボットが優れている理由
+    - １度に3つの領域に分割できる
+        - より多くのパーティションに分けることで、再帰呼び出しの回数が減る
+    - データの偏りが抑えられる
+        - ピボットを2つ使うことで、データをより均等に分割できる確率が高まる
+        - これにより、再帰ツリーがより「浅く」なります。
+    - キャッシュとメモリ効率が良い
+        - 1回のパーティション処理でより多くの要素を処理できるため、CPU観点での局所が向上する
 
 ## <span style="color:#802548">_振り返り_</span>
 
-- OOP版　ー＞ Lomoto版 ー＞ 中央値探索　ー＞ Hoare版 ー＞ ３Way版 ー＞ ハイブリッド版 ー＞ Javaのダブルピボット
+- OOP版　ー＞ Lomuto版 ー＞ 中央値探索　ー＞ Hoare版 ー＞ ３Way版 ー＞ ハイブリッド版 ー＞ Javaのダブルピボット
+
+- OOP版は理解しやすいだけに、効率は悪い
+- LomotoはOOPより効率は高いけど、ピボットの選択が最悪のケースに陥る可能性がわりとある
+- 中央値はピボットの選択で最悪のケースに陥りにくいが、Lomuto自体がスワップが多く、スワップで遅い
+- スワップの回数を抑えるため、Hoare版を取り入れる
+- 重複の可能性のあるロジックについてLomutoもHoareも効率が優れてないので、３Wayの方法を作成
+- 全てを踏まえて、堅牢なハイブリット版を導入する
+- ピボットを１つじゃなくて、２つにするダブルピボット版を実装する
 
