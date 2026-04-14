@@ -421,3 +421,74 @@ func ExecutePartialMergeSort(arr []int, n int, y int) {
 
 
 ## <span style="color:#802548">_振り返り_</span>
+- 再帰を多彩の活用に気づけなかった
+
+
+```go
+func MergeSort(arr []int) []int {
+    .
+    .
+    .
+    beforeArray = MergeSort(beforeArray)
+    afterArray =  MergeSort(afterArray)
+}
+```
+
+- 再帰関数が１つだけで済むと勘違いしていた
+
+```go
+func MergeSort(arr []int) []int {
+    .
+    .
+    .
+	beforeArray = MergeSort(beforeArray)
+	afterArray =  MergeSort(afterArray)
+
+	return merge(beforeArray, afterArray)
+}
+```
+
+
+- 必ず先頭のインデックスには最小とか最大の数値が並ぶことがわからなかった
+- 振り子のように、左と右のスライスを行ったり来たりすることをどうやって実装するのかピンとこなかった
+
+```go
+func merge(left, right []int) []int {
+    result := []int{}
+
+    i := 0
+    j := 0
+
+    //while
+    for i < len(left) && j < len(right) {
+        if left[i] < right[j] {
+            result = append(result, left[i])
+            i++
+        } else {
+            result = append(result, right[j])
+            j++
+        }
+    }
+    .
+    .
+    .
+
+    return result
+}
+```
+
+
+- 最後の値は触れられてない状態なので、以下の通り、最後の値を入れる処理が必要だと思えなかった
+
+```go
+// 最後の要素を処理
+for i < len(left) {
+    result = append(result, left[i])
+    i++
+}
+
+for j < len(right) {
+    result = append(result, right[j])
+    j++
+}
+```
