@@ -1,10 +1,10 @@
 ---
-title: Heap sort
+title: ヒープソート
 published: true
 categories: [algorithm]
 ---
 
-## <span style="color:#802548">_実装ーheap sort_</span>
+## <span style="color:#802548">_実装ーヒープソート_</span>
 - 最初ダイアグラムとかを見たが、さっぱり理解ができなかった
 - なので、少しヒントをくれと言ってルールや原則なども貰ったけど、それでも何も理解できなかった
 
@@ -29,7 +29,7 @@ left := 2*i + 1
 right := 2*i + 2
 ```
 
-## <span style="color:#802548">_実装ーＭＡＸＨＥＡＰを作る_</span>
+## <span style="color:#802548">_実装ーＭＡＸヒープを作る_</span>
 - それを理解してから、MaxHeapというものを調べた
 - 最初は MaxHeapを作る
 - MaxHeapを作るためのループの対象となるインデックスは子がある親要素だけだ
@@ -224,3 +224,44 @@ func main() {
 }
 ```
 
+
+## <span style="color:#802548">_深く探求ーJavaヒープクラス_</span>
+
+. Java’s Heap = PriorityQueue
+
+PriorityQueue is internally implemented using a binary heap.
+
+By default:
+
+It is a Min Heap
+
+- OSスケジュール
+
+```java
+import java.util.*;
+
+class Task {
+    String name;
+    int priority;
+
+    Task(String name, int priority) {
+        this.name = name;
+        this.priority = priority;
+    }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        PriorityQueue<Task> pq =
+            new PriorityQueue<>((a, b) -> b.priority - a.priority); // Max Heap
+
+        pq.add(new Task("Low", 1));
+        pq.add(new Task("Medium", 5));
+        pq.add(new Task("High", 10));
+
+        while (!pq.isEmpty()) {
+            System.out.println(pq.poll().name);
+        }
+    }
+}
+```
