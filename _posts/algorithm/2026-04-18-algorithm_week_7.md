@@ -633,6 +633,184 @@ fmt.Println(*s.data[0])
 ```
 
 
+## <span style="color:#802548">_深く探究ーヌルクリアの順序がGoで重要な理由_</span>
+
+- Javaでは、サイズを最初に調節しても問題ない
+- それは、javaでは配列が初期容量が指定されてるからだ
+
+```java
+int lastIndex = size - 1;
+E element = elements[lastIndex];
+elements[lastIndex] = null; 
+size--;
+
+// どちらでもOK
+int lastIndex = --size;
+E element = elements[lastIndex];
+elements[lastIndex] = null; 
+```
+
+- Goでは、ほぼ配列じゃなくて、Sliceで作ることになる
+- Sliceは、可変長配列なので、容量の調節を先にできるようにしたら、メモリ破損が起こりえる
+- 特に、下記のようにSliceから特定のインデックスを論理削除するときは、汚染が起こりがち
+```go
+stack.elements = stack.elements[:lastIndex]
+```
+- そのため、必ず容量の調節の先にNull初期化をすることになっている
+
+```go
+lastIndex := len(stack.elements) - 1
+e := stack.elements[lastIndex]
+stack.elements[lastIndex] = zero
+stack.elements = stack.elements[:lastIndex]
+```
+
+
+
+## <span style="color:#802548">_深く探究ー並行キュー_</span>
+
+- 並行キューは Nodeが必要とされる
+
+- nextにatomic.Pointerがついてる理由はレースコンディションを避けるためだ
+
+- headとtailは、nextみたいにポインターとして使用されるフィールドは全部atomic演算が必要だ
+- 実際に値を格納する箱なので、レースコンディションが起きてはいけないからだ
+
+```go
+type node[T any] struct {
+    value T
+    next  atomic.Pointer[node[T]]
+}
+
+type LockFreeQueue[T any] struct {
+    head atomic.Pointer[node[T]]
+    tail atomic.Pointer[node[T]]
+}
+```
+
+- 空の場合、 すぐnilを格納したりはしない
+- dummyを入れてdummyがnilになる仕組み
+- dummyがクッションの役割を担当する
+
+```text
+empty = head=nil, tail=nil ❌
+head → dummy → nil
+tail ──────────┘
+```
+
+
+- 直接入れても問題ないのと思うかもしれないけど、レースコンディションを避けるため必要な仕組みだ
+- それに加えて、Headがいつもポインターノードを参照することになる
+
+```go
+func NewLockFreeQueue[T any]() *LockFreeQueue[T] {
+    dummy := &node[T]{}
+    q := &LockFreeQueue[T]{}
+    q.head.Store(dummy)
+    q.tail.Store(dummy)
+    return q
+}
+```
+
+- 以下はロックフリーの状態でどうレースコンディションを避けるのかについてのロジック
+    - レースコンディションを避けつつ、ロックフリーの演算をするためには CAS が必要
+    - 次のノードが nil なら、ほかのスレッドに触られたりしてない状態なので値を格納できる
+        - tail.next.CompareAndSwap(nil, newNode)
+    - なので、 値を入れることができたら、その後で tailも新しく合わせて設定する
+        - q.tail.CompareAndSwap(tail, newNode)
+    - 次のノードが nilではない場合、ほかのスレッドに触られてしまったため、もう1度For文を繰り返してプッシュが成功するまでリトライ
+
+```go
+func (q *LockFreeQueue[T]) Enqueue(v T) {
+    newNode := &node[T]{value: v}
+
+    for {
+        tail := q.tail.Load()
+        next := tail.next.Load()
+
+        if next == nil {
+            // Try to link new node
+            if tail.next.CompareAndSwap(nil, newNode) {
+                // Move tail forward (optional optimization)
+                q.tail.CompareAndSwap(tail, newNode)
+                return
+            }
+        } else {
+            // Tail is behind, fix it
+            q.tail.CompareAndSwap(tail, next)
+        }
+    }
+}
+```
+
+
+
+
+
+- Dequeueをするとき、値がないときは、何もないということなので、nilをリターンする
+
+```go
+func (q *LockFreeQueue[T]) Dequeue() (T, bool) {
+    var zero T
+
+    for {
+        head := q.head.Load()
+        tail := q.tail.Load()
+        next := head.next.Load()
+
+        if next == nil {
+            return zero, false // empty
+        }
+
+        if head == tail {
+            // Tail is falling behind
+            q.tail.CompareAndSwap(tail, next)
+            continue
+        }
+
+        value := next.value
+
+        if q.head.CompareAndSwap(head, next) {
+            return value, true
+        }
+    }
+}
+```
+
+- 上のソースコードを見ると、head == tail がよく理解ができてなかった
+- head が tailの場合、headが tailになるとかありえないと思うかもしれない
+    - ただ、これは並行キューでロックフリーなので、あり得る
+    - 特にコンテキスト変換ではこういうことが頻繫に起きるので、防御ロジックが必要
+- 以下はスレッド Aが値を入れるには成功したけど、まだ tailを移動させる作業までは完成してない場合のシナリオだ
+    - tailを移動させる演算がまだできてないので、dummyになってる
+
+```text
+スレッド A (Enqueue 開始)
+
+tail := q.tail.Load()   // dummy
+next := tail.next.Load() // nil
+
+tail.next.CompareAndSwap(nil, newNode)ーーー＞成功
+
+👉 成功した後の状態
+
+head → dummy → A → nil
+tail ─────────┘   
+```
+
+- 削異った場合にほかのスレッドが入って作業をすることになると、tail が更新されてないままだ
+- head == tail という ロジックがないと、ロジックに穴ができてしまう
+- スレッドAが tailの更新を終わらせるまでには、head == tail の状態であるためだ
+
+```text
+スレッド B (Dequeue 開始)
+
+現在の状態
+
+head == tail   ✅ (both dummy)
+next != nil    ✅ (A exists)
+```
+
 ## <span style="color:#802548">_振り返り_</span>
 
 - 効率に優れるキューを実装するために、サーキュラーバッファーの形で実装する必要があるという考えに及ばなかった
@@ -659,6 +837,7 @@ tail int
 q.elements[q.tail] = e
 tail = (tail + 1) % len(q.elements);
 ```
+
 
 
 
