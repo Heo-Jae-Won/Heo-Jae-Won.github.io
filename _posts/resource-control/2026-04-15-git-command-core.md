@@ -38,11 +38,35 @@ git branch -m [current branch] [future branch name]
 git remote show origin
 ```
 
+
+## <span style="color:#802548">_branch repulishing when divergence wrong_</span>
+
+```shell
+git branch -d [branch name]
+git push origin --delete [branch이름]
+
+git switch [branch that should be origin]
+git switch -c [new featrue branch]
+```
+
 ## <span style="color:#802548">_remove local change_</span>
 
 ```shell
 git restore [filename]
 ```
+
+## <span style="color:#802548">_remove local change untracked_</span>
+
+```shell
+git clean -fdn
+```
+
+## <span style="color:#802548">_stash untracked and staged_</span>
+
+```shell
+git stash push -u -m "message"
+```
+
 
 ## <span style="color:#802548">_adding file staging area_</span>
 
