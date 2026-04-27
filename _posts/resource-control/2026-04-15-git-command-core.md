@@ -22,6 +22,33 @@ git branch -r
 git switch [remote branch]
 ```
 
+## <span style="color:#802548">_when branch is deleted by remote and sustained in local_</span>
+
+- just fetch origin is not enough. needs prune
+
+```shell
+git fetch origin --prune
+git branch -d [branch] 
+```
+
+## <span style="color:#802548">_when do git pull with my branch remote_</span>
+
+```shell
+git pull --rebase --autostash
+## if error happens, rather to use merge
+git rebase --abort
+git pull
+```
+
+## <span style="color:#802548">_when do git pull with dev remote_</span>
+
+```shell
+git pull origin dev --rebase --autostash
+## if error happens, rather to use merge
+git rebase --abort
+git pull
+```
+
 ## <span style="color:#802548">_branch manipulation_</span>
 - make new branch and move
 - delete remote and local branch both

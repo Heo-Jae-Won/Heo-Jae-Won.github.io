@@ -364,7 +364,8 @@ func (q *Queue[T]) Poll() (T, bool) {
 ## <span style="color:#802548">_深く探究ーデキューで文字列を反転させる_</span>
 
 - ただのキューだけじゃ、時間計算量が非効率になる
-- そのため、Dequeを作成して文字列を反転させる
+- そのため、デキューを作成して文字列を反転させる
+- リサイズまでのロジックは全くキューと同じ
 
 ```go
 type Deque[T any] struct {
@@ -398,7 +399,14 @@ func (d *Deque[T]) resize() {
 	d.tail = d.size
 	d.capacity = newCap
 }
+```
 
+
+- PushBackはtailに追加ーー＞スタックのPush()の操作
+- PopFrontはheadから削除ーー＞キューのPoll()の操作
+
+
+```go
 func (d *Deque[T]) PushBack(v T) {
 	if d.size == d.capacity {
 		d.resize()
@@ -435,6 +443,30 @@ func (d *Deque[T]) PopFront() T {
 	return v
 }
 
+func (d *Deque[T]) Size() int {
+	return d.size
+}
+```
+
+- PopBackはtailから削除ーー＞スタックのPop()の操作
+- PushFrontはheadに追加ーー＞デキューだけのNew操作
+- ただ、PushFrontとPopBackはスタックやキューと動作の原則が違う
+    - PushFrontはHeadが後ろに移動していく形
+        - 要素がない４サイズのデキューだとしたら、Headが３になってどんどん0に行く
+    - PopBackは
+- 「デキュー（Dequeue）は基本的に両方向なので、headが3でもtailが0になり得ます。」
+
+```go
+func (d *Deque[T]) PushFront(v T) {
+	if d.size == d.capacity {
+		d.resize()
+	}
+
+	d.head = (d.head - 1 + d.capacity) % d.capacity
+	d.buf[d.head] = v
+	d.size++
+}
+
 func (d *Deque[T]) PopBack() T {
 	if d.size == 0 {
 		panic("empty deque")
@@ -450,11 +482,11 @@ func (d *Deque[T]) PopBack() T {
 
 	return v
 }
+```
 
-func (d *Deque[T]) Size() int {
-	return d.size
-}
+- デキューで文字列を反転させる
 
+```go
 func ReverseString(s string) string {
 	d := NewDeque[rune](len(s))
 
