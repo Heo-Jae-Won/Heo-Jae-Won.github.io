@@ -78,14 +78,18 @@ git switch -c [new featrue branch]
 
 ## <span style="color:#802548">_remove local change_</span>
 
+- remove local change tracked
+
 ```shell
 git restore [filename]
 ```
 
-## <span style="color:#802548">_remove local change untracked_</span>
+- remove local change untracked
+- at first, check that file is really untracked then clean it
 
 ```shell
-git clean -fdn
+git status --ignored
+git clean -fdnx
 ```
 
 ## <span style="color:#802548">_stash untracked and staged_</span>
@@ -95,19 +99,7 @@ git stash push -u -m "message"
 ```
 
 
-## <span style="color:#802548">_adding file staging area_</span>
-
-- add file in staging area for only update and delete
-
-```shell
-git add -u
-```
-
-- add file in staging area for all
-
-```shell
-git add .
-```
+## <span style="color:#802548">_remove staged file from staging area_</span>
 
 - removing all staged file
 
@@ -115,7 +107,7 @@ git add .
 git restore --staged .
 ```
 
-## <span style="color:#802548">_add file to just before commit_</span>
+## <span style="color:#802548">_add file to just before commit when not yet pushed_</span>
 
 - no need to increase commit for adding file
 
@@ -124,10 +116,11 @@ git add [file]
 git commit --amend -m "message" # or git commit --amend  
 ```
 
-- removing just before commit, preseving file on worksapce
+- basically, commit --amend rewrites commit history
+- so if u already pushed it, u need to push it force
 
 ```shell
-git reset --mixed
+git push --force-with-lease
 ```
 
 ## <span style="color:#802548">_when u want to do experiment about bugs using completely different branch_</span>
@@ -207,22 +200,12 @@ alias.ll=log --pretty=format:%C(yellow)%h%Cred%d\ %Creset%s%Cblue\ [%cn] --decor
 ```
 
 
-## <span style="color:#802548">_git username email config_</span>
-
-```shell
-git config user.name [username]
-git config user.email [email]
-```
-
-
 ## <span style="color:#802548">_seeing previous commit content_</span>
 
 ```shell
-git restore --source HEAD~0 [파일이름] ---> current file. useless
-git restore --source HEAD~1 [파일이름] ---> 1 commit before file.
-git restore --source HEAD~2 [파일이름] ---> 2 commit before file.
+git checkout [commithash] 
 
-git restore [파일이름]---> go back to original HEAD 
+git switch -
 ```
 
 ## <span style="color:#802548">_HEAD~ and HEAD^ diff for merge commit_</span>
@@ -562,4 +545,21 @@ up to date
 ```
 
 
+## <span style="color:#802548">_credential manager initialization_</span>
 
+- if u want to initialize credential manager, u need to do it on below path
+
+```text
+Control Panel → Credential Manager → Windows Credentials
+```
+
+- then look for entries like:
+
+```text
+git:https://dev.azure.com/...
+MicrosoftAccount
+Azure DevOps
+```
+
+- if u found it, then remove that credentials and try to git fetch
+- then, new login authentication message is displayed.
