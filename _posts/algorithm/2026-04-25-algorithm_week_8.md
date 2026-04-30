@@ -67,10 +67,10 @@ func binarySearch(arr []int, target int) int {
 ```
 
 - 二分探索が線形探索より性能に優れる理由は時間計算量に起因する
-    - Linear search → O(n)
-    - Binary search → O(log n)
-        - Linear search → up to 1,000,000 checks
-        - Binary search → about 20 checks
+    - 線形探索 → O(n)
+    - 二分探索 → O(log n)
+        - 線形探索 → 1,000,000 回
+        - 二分探索 → 20 回
 
 ```text
  1 回目 → n/2
@@ -86,7 +86,6 @@ k=log2​n
 
 ## <span style="color:#802548">_実装ー中央値計算する際異にオーバーフローを防ぐロジック_</span>
 - 以下のように実装したら、オーバーフローになってしまう
-- If left and right are very large integers, their sum can exceed the maximum value of int.
 
 ```go
 mid := (left + right) / 2
@@ -118,31 +117,19 @@ target = 0  → lower_bound = 0
 target = 6  → lower_bound = 6 (end)
 ```
 
-- lower_boundは >= targetであるため、そうでない場合、arr[mid] < targetはもう１度繰り返して探す
+- lower_boundは arr[i] >= targetであるが、その値が始まる領域の境界値だと思えばいい
+- 探す条件は二分探索と同じ
+    - arr[mid] < targetはlower_boundの反対条件なので、左はもう見ることもないので、右に行く
+        - 従って、left = mid + 1
+    - しかし、else(arr[mid] >= target )の場合は、midも候補としてありえるので、midを保ちつつ左に行く
+        - 従って、rigth = mid
 - lower boundは最終的には右と左が同じくなるが、慣例上、左を返す
     - それに加えて、左には条件を満たす最初のインデックスという意味も込められているので、左にする
-    - ただ、これは繰り返しの条件が left < rightのみの話
 
-    Why right = mid in the else?
-
-The else means:
-
-arr[mid] > target
-
-So:
-
-👉 mid is a valid candidate for upper bound
-👉 BUT there might be an earlier one on the left
-
-So we do:
-
-right = mid
-
-which means:
-
-"keep mid, and continue searching left"
-
-
+- left < rightの場合は、右側は考慮されない
+- そのため、mid が右のインデックスになる可能性も考えなければならない
+    - right = mid 
+- right = mid - 1になってしまうと、[left, mid-1)になるため、正確な領域の設定ができなくなる
 
 ```go
 func lowerBound(arr []int, target int) int {
@@ -163,7 +150,11 @@ func lowerBound(arr []int, target int) int {
 ```                 
 
 - 以下も同じでが、そこに潜んでいる考えが違う
-- 
+- これはもっと直感敵に理解しやすいが、領域という概念が中心ではない
+- lower_boundはarr[i] >= targetであるため、必ずその条件で見つかる
+- そのため、else文では見つからない
+- low < highであった条件式が low <= highに変わったことが見られる
+- left <= rightは、二分探索とロジックが同じなので、理解しやすいが、余計な変数が必要とされる
 
 ```java
 static int lowerBound(int[] arr, int target) {
@@ -173,18 +164,10 @@ static int lowerBound(int[] arr, int target) {
     while (low <= high) {
         int mid = low + (high - low) / 2;
         
-        // If arr[mid] >= target, then mid can be the
-        // lower bound, so update res to mid and
-        // search in left half, i.e. [lo...mid-1]
         if (arr[mid] >= target) {
             res = mid;
             high = mid - 1;
-        }
-        
-        // If arr[mid] < target, then lower bound
-        // cannot lie in the range [lo...mid] so
-        // search in right half, i.e. [mid+1...hi]
-        else {
+        } else {
             low = mid + 1;
         }
     }
@@ -199,52 +182,10 @@ public static void main(String[] args) {
 }
 ```
 
-
-Key Differences
-1. Need for res
-Your version → ✅ needs res
-Boundary version → ❌ no extra variable
-
-👉 Less state = fewer bugs
-
-2. Edge Case Handling
-
-Your version must carefully initialize:
-
-int res = n; // or -1 depending on definition
-
-Otherwise:
-
-If no element ≥ target → ❌ wrong result
-
-The boundary version:
-
-automatically returns n (insertion point)
-no special handling needed
-3. Loop Condition
-Your version → low <= high
-Boundary version → left < right
-
-👉 The second one guarantees:
-
-no infinite loop
-clean convergence to a single point
-4. Conceptual Difference
-
-Your approach is:
-
-"Find answer while searching"
-
-Boundary approach is:
-
-"Find the boundary directly"
-
-This boundary idea is extremely powerful:
-
-[ < target | >= target ]
-            ^
-
-
+- [left, right)と[left, right]はロジックが違くなる
+- [left, right)のほうがよりソースコードとしては完成度が高い
+    - 余計な変数が必要
+    - 無限ルールを防げる
 
 - upper boundは targetより大きい値が最初に現れる位置
 
@@ -258,10 +199,15 @@ upper_bound → 4（最初の「2より大きい値」= 4）
 ```
 
 
-- upper_bound > targetであるため、そうでない場合、arr[mid] <= targetはもう１度繰り返して探す
+- upper_boundは arr[i] > targetであるが、その値より大きい値が始まる領域の境界値だと思えばいい
+- 探す条件は二分探索と同じ
+    - arr[mid] <= targetはupper_boundの反対条件なので、左はもう見ることもないので、右に行く
+        - 従って、left = mid + 1
+    - しかし、else(arr[mid] > target )の場合は、midも候補としてありえるので、midを保ちつつ左に行く
+        - 従って、rigth = mid
 - upper_boundは最終的には右と左が同じくなるが、慣例上、左を返す
     - それに加えて、左には条件を満たす最初のインデックスという意味も込められているので、左にする
-    - ただ、これは繰り返しの条件が left < rightのみの話
+
 ```go
 func upperBound(arr []int, target int) int {
     left, right := 0, len(arr)
@@ -286,6 +232,9 @@ func upperBound(arr []int, target int) int {
 
 ## <span style="color:#802548">_深く探求ー1番目の登場位置探す_</span>
 
+- 二分探索とほぼ同じだが、最初の位置を求めてるため、mid値を見つけても、即座にリターンするわけにはいかない
+- もっと左に移動して探し続けて最初の位置を返す
+
 ```go
 func firstOccurrence(arr []int, target int) int {
     left, right := 0, len(arr)-1
@@ -295,8 +244,8 @@ func firstOccurrence(arr []int, target int) int {
         mid := left + (right-left)/2
 
         if arr[mid] == target {
-            ans = mid        // record answer
-            right = mid - 1  // move LEFT to find earlier one
+            ans = mid        
+            right = mid - 1  
         } else if arr[mid] < target {
             left = mid + 1
         } else {
@@ -307,6 +256,9 @@ func firstOccurrence(arr []int, target int) int {
     return ans
 }
 ```
+
+
+- 同じ結果を作る関数だが、領域を決める bound類のロジックに近い
 
 
 ```go
@@ -330,6 +282,8 @@ func firstOccurrence(arr []int, target int) int {
 }
 ```
 
+
+- go langのAPIで以下のように簡潔にできる
 
 ```go
 import "sort"
