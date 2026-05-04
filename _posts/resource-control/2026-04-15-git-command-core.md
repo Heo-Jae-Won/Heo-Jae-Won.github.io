@@ -4,6 +4,68 @@ published: true
 categories: [resource-control]
 ---
 
+
+
+## <span style="color:#802548">_git rebase miss caution_</span>
+
+- if u want to pull rebase, then dont need to fetch - rebase
+- just pull with rebase option is enough
+
+```shell
+git pull origin develop --rebase -->O
+```
+
+- rebase command can cause a problem
+- pull commnad make a space between remote and branch
+- but rebase doesnt, so it would produce uninteded actions
+
+```shell
+git rebase origin develop --rebase  #-->X
+git rebase origin/develop           #-->O
+```
+
+
+## <span style="color:#802548">_how to view git stash content_</span>
+
+```
+***how to see content of git stash
+```
+
+```
+if stash pop error happens, stash pop doesnt drop stash.
+it is preserved in stash list still
+if u doing stash, first message should be WIP
+```
+
+```
+git fsck --lost-found
+git show <commit hash>
+```
+
+```
+what is git stash show -p stash@{0} ??
+```
+
+
+
+```
+if u want alias column like
+select 
+count(*) AS TOTAL_COUNT
+
+
+then in C#, just writing that alias column as a column name is enough
+[Column("TOTAL_COUNT")]
+public int? TotalCount {get, set};
+```
+
+
+- == can be overrided in C#
+- so, if u want to compare with null, always use is null or is not null in modern C#
+
+
+
+
 ## <span style="color:#802548">_clone branch_</span>
 
 - branch clone
