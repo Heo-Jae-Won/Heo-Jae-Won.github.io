@@ -686,24 +686,22 @@ change(&str);　// world
 
 
 - 関数のパラメータにおいて、char ** は文字列のポインターだ
-- szRecBuffは 間接参照された szFileBuffなので、文字列のポインターでなく、文字列だ
+- fileBuffは 間接参照された fileBuffなので、文字列のポインターでなく、文字列だ
 - その文字列を間接参照すると、文字になる
 - あの文字の値を比較して、if文に当てはまると、次のポインターを移動する
-    - szRecBuffは文字列なので、次のポインターは次の文字を指す
+    - fileBuffは文字列なので、次のポインターは次の文字を指す
 
 
 ```C
 static int chopData(
-    char *szCol,
-    char **szFileBuff
+    char **fileBuff
 ) {
-    char *szRecBuff;
-    char szColmBuff[13 + 1];
+    char *recBuff;
 
-    szRecBuff = *szFileBuff; // string
+    recBuff = *fileBuff; // string
     if( (*szRecBuff == '"') ) {
         isQuoted = false;
-        szRecBuff++; // next char
+        recBuff++; // next char
     }
     .
     .
@@ -711,39 +709,32 @@ static int chopData(
 } 
 ```
 
-- pszCheckRecは文字列なので、そこで＆をつけたら、文字列のポインターになる
-- つまり、char **pszCheckRecみたいなパラメータに持たせることができる
+- checkCodeは文字列なので、そこで＆をつけたら、文字列のポインターになる
+- つまり、char **checkCodeみたいなパラメータに持たせることができる
 
 ```C
-char *pszCheckRec;
-char szFileBuff[512];
-pszCheckRec = szFileBuff;
-nRet = chopData( szCol, &pszCheckRec);
+char *checkCode;
+char fileBuff[512];
+checkCode = fileBuff;
+nRet = chopData( szCol, &checkCode);
 ```
 
-- pszBufがchar**であるため、Stringのポインターだ
-- それを間接参照した*pszBufはStringになる
-- それを二重間接参照した**pszBufはCharになる
+- tempが char**であるため、Stringのポインターだ
+- それを間接参照した*tempはStringになる
+- それを二重間接参照した**tempはCharになる
 
 ```C
 int inspectCSV(
-    char *pszCol,
-    char **pszBuf,
+    char *col,
+    char **temp,
     short nMode
 ) {
-    char *pszBufTmp;
+    char *tempBuff;
     int i;
-    pszBufTmp = *pszBuf;
+    tempBuff = *temp;
     .
     .
 
-    if(**pszBuf == ',' )  {
-        (*psBuf)++;
-    } else {
-        return (SU_CSV_END);
-    }
-
-    return (0);
 }
 ```
 
@@ -862,6 +853,16 @@ char array[3][4 + 1] = {
 };
 ```
 
+## <span style="color:#802548">_C：タイプキャスト_</span> 
+
+- (size_t)は値をキャスト
+- (size_t *)はポインターをキャスト
+
+
+```C
+buflen = (size_t) sizeof (stmt_buf);
+sqlgls(stmt_buf, (size_t *) &buflen, (size_t *) &function_code);
+```
 
 ## <span style="color:#802548">_C：動的にStringに値を与える_</span> 
 
