@@ -430,6 +430,43 @@ mput file
 scp root@111.223.44.11:~/file 
 # 해당 서버로 파일을 암호화하여 전송. sftp와 별개
 ```
+
+
+## <span style="color:#802548">_14. 로그보기_</span>
+```sh
+alias 
+# 로그 관련 tail 명령어가 분명히 있을 것이다. 거기서 경로를 알아낸다.
+
+cd 경로
+# 해당 경로로 이동한다. .log파일 이전까지만 이동
+
+cat ~~.log | grep 'keyword' -n
+# 검색하려는 키워드를 보여주고, 줄수를 보여준다.
+
+vi ~~~.log
+# 해당 로그파일을 수정모드로 연다. 실제 수정은 하지 않을 것이다.
+
+
+:[해당줄수] 
+# 보통 내가 실행한 api 시간을 보고 그에 맞는 줄수를 검색한다. 
+
+pageup/pagedown
+# 거기서부터 페이지를 올리고 내리면서 계속 로그를 본다.
+```
+
+
+
+## <span style="color:#802548">_서비스 만들기_</span>
+
+```sh
+sudo journalctl -u tanomuzoko -f #돌아가고 있는 process에 접속하는 것. logback 없을 떄 로그보는 용도.
+
+sudo systemctl status mysql     # 해당 서비스가 running인지, 
+
+sudo systemctl status tanomuzoko.service #시작 시 jvm option은 무엇인지 등 볼 수 있음.
+
+sudo vi /etc/systemd/system/tanomuzoko.service #service 관련 start option 등 설정하는 것
+```
  
 
 
