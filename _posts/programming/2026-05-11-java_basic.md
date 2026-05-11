@@ -861,3 +861,14 @@ public class LargeFileProcessor {
     - エラーハンドルがちゃんとできてる
     - シンボリックリンクを扱える
     - 一括操作や全般的なパフォーマンスに優れる
+
+
+
+## <span style="color:#802548">_Stringのメソッドの活用し方_</span>
+- ただ文字列を比較するためであれば、 substring.eqaulsは必要ではない
+- indexOfで十分
+
+```java
+string.substring().equals() 
+string.indexOf(str) >= 1  
+```
