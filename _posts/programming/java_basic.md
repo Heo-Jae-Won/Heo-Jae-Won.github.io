@@ -1,3 +1,50 @@
+## <span style="color:#802548">_JDK変化の主要変化_</span>
+1.2：コレクションフレームワーク (Collection Framework)
+1.4：NIOパッケージ（Pathクラス用ユーティリティのFiles、新機軸のブロックI/OであるPath、ノンブロッキングI/OのChannels）
+1.5：ジェネリクス、列挙型 (Enum)、アノテーション、オートボクシング、拡張for文、java.util.concurrent（Future, Executor, ExecutorService, 並行コレクション, ロック, アトミック変数）
+1.7：try-with-resources文、switch文での文字列利用、ダイヤモンド演算子 (<>) による型推論、非同期I/O、Fork/Joinフレームワーク
+1.8：Date and Time API (LocalDateTime)、ストリーム API、ラムダ式、CompletableFuture
+1.9：JDKのモジュール化 (Project Jigsaw)、Reactive Streams用のFlow API
+11：HTTP Client API
+14：switch式15：テキストブロック
+16：レコード型 (record)
+17：封印クラス (sealed)
+21：仮想スレッド (Virtual Threads)
+
+
+
+## <span style="color:#802548">_JDK変化を目的ごとに_</span>
+- コレクション
+    - コレクションを扱うため：collection framework (1.2)
+        - List, Set, Map
+    - 並行処理用途のコレクションを扱うため： Concurrent Collections(1.5)
+        - CopyOnWriteArrayList, ConcurrentHashMap, ConcurrentLinkedDeque, PriorityBlockingQueue
+    - コレクション操作を宣言的に記述するため： Stream(1.8)
+- タイプ
+    - コレクションのタイプの安全性を確保するため： generics (1.5)
+    - 定数の安全性を確保するため： enum (1.5)
+- ファイル I/O
+    - バッファとチャネルによる高速化するため： nio package (1.4)
+        - ByteBuffer, SocketChannel, Selector
+    - パス単位の操作や非同期I/Oをサポートするため： nio.2 package  (1.7)
+        - Path, Paths, Files, AsynchronousFileChannel
+    - ストリームの開閉を自動化するため：try with resources (1.7)
+- スレッド
+    - スレッドの低レベルな管理を抽象化し、並行処理の実装を容易にするため： java.util.concurrent (1.5)
+        - Executor, ExecutorService, Executors, ThreadPoolExecutor, Future, Lock, ReentrantLock, AtomicInteger 
+    - 大量のリソースを効率的に分割して並列処理するため： Fork/Join framework (1.7)
+        - RecursiveTask, RecursiveAction
+    - コールバック地獄を避け、非同期処理を繋げるため：CompletableFuture (1.8)
+    - 軽量なスレッドで大量の並行処理を支えるため ：virtual threads (21)
+- 不変性 
+    - 日付操作の不変性とスレッドセーフを確保するため：LocalDateTime (1.8) 
+    - 簡潔に不変なコレクションを生成するため：Immutable Collections Factory Methods (1.9)
+    - 不変なデータ保持クラス：record class (16)
+- 関数的プログラミング 
+    - 処理を簡潔に記述・受け渡しするため：ラムダ式 (1.8)
+- Reactive Streamsを実現するため：flow api (1.9)
+- 標準でモダンなHTTP通信を行うため：HTTP Client API  (11)
+
 ## <span style="color:#802548">_メモリを節約する_</span>
 - 事前に確定している値の計算には、静的コンストラクタを使用する
 - 以下のメソッドは間違えている
@@ -418,35 +465,60 @@ public class Student{
 }
 ```
 
-- 해당 stream으로 구성해서 값을 분류하여 collection에 넣는다.
+
+## <span style="color:#802548">_streamのcollectのpartitiongByとgroupingBy_</span>
+
+- partitioningByはPredicateを受け取って、取り出すときはgetと true, falseを指定してその条件に当てはまるListだけを返す
+- 基本的な活用は以下となる
 
 ```java
 Map<Boolean, List<Student>> stuBySex = stuStream.collect(partitioningBy(Student::isMale));
-List<Student> maleStudent = stuBySex.get(true);    //Map에서 남성 목록을 얻어온다.
-List<Student> femaleStudent = stuBySex.get(false); //Map에서 여성 목록을 얻어온다.
+List<Student> maleStudent = stuBySex.get(true); 
+List<Student> femaleStudent = stuBySex.get(false);
+```
 
+- そこでカウントを返したいと思うならば、counting()というメソッドも追加
+
+```java
 Map<Boolean,Long> stuNumBySex = stuStream.collect(partitioningBy(Student::isMale, counting()));
-System.out.println("남학생 수: " + stuNumBySex.get(true)); //8
-System.out.println("여학생 수: " + stuNumBySex.get(false)); //10
+long maleStudentCount = stuNumBySex.get(true); 
+long femaleStudentCount = stuNumBySex.get(false);
+```
 
-Map<Boolean,Optional<Student>> topScoreBySex = stuStream.collect(partitioningBy(Student::isMale, maxBy(comparingInt(Student::getScore))));
-System.out.println("남학생 1등: " + topScoreBySex.get(true)); //Optional[[나자바,남,1,1,300]]. maxBy()는 Optional<Student>이 반환타입
-System.out.println("여학생 1등: " + topScoreBySex.get(false));//Optional[[김지미,여,1,1,250]]
+- 1番成績がいい学生を取るためには、以下となる
 
-Map<Boolean,Optional<Student>> topScoreBySex = stuStream.collect(partitioningBy(Student::isMale, collectingAndThen(maxBy(comparingInt(Student::getScore), Optional::get))));
-System.out.println("남학생 1등: " + topScoreBySex.get(true)); //남학생 1등: [나자바, 남, 1, 1, 300]. collectingAndThen을 추가해주면 Student가 반환타입.
-System.out.println("여학생 1등: " + topScoreBySex.get(false));//여학생 1등: [김지미, 여, 1, 1, 250]
+```java
+Map<Boolean,Optional<Student>> topScoreBySex = stuStream.collect(partitioningBy(Student::isMale, maxBy(Comparator.comparingInt(Student::getScore))));
+Optional<Student> maleStudentCount = topScoreBySex.get(true); 
+Optional<Student> femaleStudentCount = topScoreBySex.get(false);
+```
 
-Map<Boolean, Map<Boolean,List<Student>>> failedStuBySex = stuStream.collect(partitioningBy(Student::isMale, partitioningBy(s -> s.getScore() < 150))); //partitioningBy안에서 또 partitioningBy를 호출해서 조건을 두개를 &&로 연결
-List<Student> failedMaleStu = failedStuBySex.get(true).get(true); // 남성 중 성적이 150점 이하인 사람
-List<Student> failedMaleStu = failedStuBySex.get(false).get(true); //여성 중 성적이 150점 이하인 사람
+- Optionalを取り出すことが億劫であれば、直接中身を取り出しても問題ない
 
-Map<Integer, List<Student>> stuByBan = stuStream.collect(groupingBy(Student::getBan, /*toList()*/)); //toList()는 생략가능
+```java
+Map<Boolean,Optional<Student>> topScoreBySex = stuStream.collect(partitioningBy(Student::isMale, collectingAndThen(maxBy(Comparator.comparingInt(Student::getScore), Optional::get))));
+Student maleStudentCount = topScoreBySex.get(true); 
+Student femaleStudentCount = topScoreBySex.get(false);
+```
+
+- 連続してpartitioningByをすることもできる
+
+```java
+Map<Boolean, Map<Boolean,List<Student>>> failedStuBySex = stuStream.collect(partitioningBy(Student::isMale, partitioningBy(s -> s.getScore() < 150)));
+List<Student> failedMaleStu = failedStuBySex.get(true).get(true); 
+List<Student> failedMaleStu = failedStuBySex.get(false).get(true); 
+```
+
+- groupingByの基本的な活用方法は以下となる
+- 条件に当てはまるかどうかを判断するPredicatteは受け取ってない
+
+```java
+Map<Integer, List<Student>> stuByBan = stuStream.collect(groupingBy(Student::getBan, toList()));
 Map<Integer, HashSet<Student>> stuByHak = stuStream.collect(groupingBy(Student::getHak, toCollection(HashSet::new)));
 ```
 
-
-- 좀 더 복잡한 예시로 점수에 따라 레벨을 나눠 그룹핑한다.
+- groupingByでも条件に応じて分類することができる
+- 以下はEnumキーを指定する流れのソースコード
 
 ```java
 Map<Student.Level, Long> stuByLevel = stuStream.collect(groupingBy(s->{
@@ -456,144 +528,60 @@ Map<Student.Level, Long> stuByLevel = stuStream.collect(groupingBy(s->{
         return Student.Level.MID;
     else
         return Student.Level.LOW;
-},counting())) //[MID] - 8명, [HIGH] - 8명, [LOW] - 2명
+},counting())) //[MID] - 8, [HIGH] - 8, [LOW] - 2
+long highCount = stuByLevel.getOrDefault(Student.Level.HIGH, 0L); 
+long lowCount = stuByLevel.getOrDefault(Student.Level.LOW, 0L); 
 ```
 
-- counting 하지 않고, Set으로 바꾼다.
+- 学年ごとに分けてから、もう1度クラスの成績ごとに分ける
 
 ```java
-Map<Integer, Map<Integer,Set<Student.Level>>> stuByHakAndBan = stuStream.collect(GroupingBy(Student::getHak,groupingBy(Student::getBan,mapping(s->{
-    if(s.getScore() >= 200)
-        return Student.Level.HIGH;
-    else if(s.getScore() >= 100)
-        return Student.Level.MID;
-    else
-        return Student.Level.LOW;
-}, toSet()))))
+Map<Integer, Map<Integer, Map<Student.Level, List<Student>>>> stuByHakAndBanMap = 
+    stuStream.collect(
+        groupingBy(Student::getHak, 
+            groupingBy(Student::getBan, 
+                groupingBy(s -> {
+                    if(s.getScore() >= 200) return Student.Level.HIGH;
+                    else if(s.getScore() >= 100) return Student.Level.MID;
+                    else return Student.Level.LOW;
+                })
+            )
+        )
+    );
+
+List<Student> highScoreStudents = stuByHakAndBanMap.get(1).get(2).get(Student.Level.HIGH);
 ```
 
-
-- 좀 더 복잡한 예시로 학년 별 그룹화 -> 반 별 그룹화를 진행한다.
-
-```java
-Map<Integer,Map<Integer,List<Student>>> stuByHakAndBan = stuStream.collect(
-				Collectors.groupingBy(Student::getHak, 
-						Collectors.groupingBy(Student::getBan)));
-```
-
-- maxBy의 return typ이 Optional이다.
-- Optional(Student)가 아니라 그냥 Student로 바꿔주기 위해 추가해준다.
-    - collectingAndThen
-    - Optional::get
+- maxByの戻り値がOptionalのため、Optional：：getを追加する
 
 ```java
 Map<Integer, Map<Integer,Student>> topStuByHakAndBan = stuStream.collect(
     groupingBy(Student::getHak, groupingBy(
         Student::getBan, collectingAndThen(
-            maxBy(comparingInt(Student::getScore),Optional::get)
+            maxBy(Comparator.comparingInt(Student::getScore),Optional::get)
             )
         )
     )
-) //각 반의 1등을 출력
+)
+Student highestScoreStudent = topStuByHakAndBan.get(1).get(2);
 ```
 
+- 必要な要素はvalueにあるため、Mapをループするためには、values()を使う
 
 ```java
-Map<Integer,Map<Integer,List<Student>>> stuByHakAndBan = stuStream.collect(
-    Collectors.groupingBy(Student::getHak, 
-        Collectors.groupingBy(Student::getBan)
-    )
-); //학년별로 그룹화 후 반별로 다시 그룹화
-
-for(Map<Integer,List<Student>> hak : stuByHakAndBan.values()){
-for(List<Student> ban : hak.values()){
-    System.out.println();
-    for(Student s : ban){
+for(Map<Integer,Student> ban: topStuByHakAndBan.values()) {
+    for(Student s : ban.values())
         System.out.println(s);
-    }
-} 
-} 
-// [나자바, 남, 1학년 1반, 300점]
-// [김지미, 여, 1학년 1반, 250점]
-// [김자바, 남, 1학년 1반, 200점]
-
-// [이지미, 여, 1학년 2반, 150점]
-// [남자바, 남, 1학년 2반, 100점]
-// [안지미, 여, 1학년 2반,  50점]
-
-// [황지미, 여, 1학년 3반, 100점]
-// [강지미, 여, 1학년 3반, 150점]
-// [이자바, 남, 1학년 3반, 200점]
-
-// [나자바, 남, 2학년 1반, 300점]
-// [김지미, 여, 2학년 1반, 250점]
-// [김자바, 남, 2학년 1반, 200점]
-
-// [이지미, 여, 2학년 2반, 150점]
-// [남자바, 남, 2학년 2반, 100점]
-// [안지미, 여, 2학년 2반,  50점]
-
-// [황지미, 여, 2학년 3반, 100점]
-// [강지미, 여, 2학년 3반, 150점]
-// [이자바, 남, 2학년 3반, 200점]
-
-
-Map<Integer, Map<Integer,Student>> topStuByHakAndBan = stuStream.collect(
-    Collectors.groupingBy(Student::getHak, 
-            Collectors.groupingBy(Student::getBan, 
-                    Collectors.collectingAndThen(
-                            Collectors.maxBy(Comparator.comparingInt(Student::getScore)),
-                                                                        Optional::get
-                            )
-                    )
-            )
-    ); //각 반의 1등을 출력
-
-
-for(Map<Integer,Student> ban: topStuByHakAndBan.values())
-for(Student s : ban.values())
-    System.out.println(s);
-    // [나자바, 남, 1학년 1반, 300점]
-    // [이지미, 여, 1학년 2반, 150점]
-    // [이자바, 남, 1학년 3반, 200점]
-    // [나자바, 남, 2학년 1반, 300점]
-    // [이지미, 여, 2학년 2반, 150점]
-    // [이자바, 남, 2학년 3반, 200점]
-
-
-Map<Integer, Map<Integer,Set<Student.Level>>> stuByHakAndBan = stuStream.collect(
-    Collectors.groupingBy(Student::getHak,
-        Collectors.groupingBy(Student::getBan,
-            Collectors.mapping(s->{
-                if(s.getScore() >= 200)
-                    return Student.Level.HIGH;
-                else if(s.getScore() >= 100)
-                    return Student.Level.MID;
-                else
-                    return Student.Level.LOW;
-                    }, Collectors.toSet()
-            )
-        )
-    )
-);
-
-Set<Integer> keySet2 = stuByHakAndBan.keySet();
-
-for(Integer key : keySet2){
-    System.out.println("[" + key + "]" + stuByHakAndBan.get(key)); //key안에 담긴 요소는 map
 }
-// [1]{1=[HIGH], 2=[MID, LOW], 3=[MID, HIGH]}. 1학년 1반은 HIGH, 2반은 MID,LOW, 3반은 MID,HIGH
-// [2]{1=[HIGH], 2=[MID, LOW], 3=[MID, HIGH]}
 ```
 
-
-- 마지막 예시의 경우 아래와 같이 String을 key로 사용하는 Set으로 고칠 수 있다.
+- groupingByのキーの場合は、操作して作っても問題ない
 
 
 ```java
 Map<String,Set<Student.Level>> stuByScoreGroup = stuStream.collect(
                                                                 Collectors.groupingBy(
-                                                                    s->s.getHak() + "-" + s.getBan(), // 1-1, 1-2, 1-3... 등을 key로 아래와 같이 mapping됨.
+                                                                    s->s.getHak() + "-" + s.getBan(), // 1-1, 1-2, 1-3..
                                                                     Collectors.mapping(s -> {
                                                                         if(s.getScore() >= 200)
                                                                             return Student.Level.HIGH;
@@ -604,12 +592,17 @@ Map<String,Set<Student.Level>> stuByScoreGroup = stuStream.collect(
                                                                     }, Collectors.toSet())
                                                                 )
                                                         );
+```
 
-Set<String> keySet2 = stuByScoreGroup.keySet();
-for(String key: keySet2){
-    System.out.println("[" + key + "]" + stuByScoreGroup.get(key)); //key안에 담긴 요소는 Set collection
+- ループは以下の通りになる
+- 学生リストは取得できないが、各学年とクラスごとのレベルは一発で把握できる
+
+```java
+Set<String> keySet = stuByScoreGroup.keySet();
+for(String key: keySet){
+    System.out.println("[" + key + "]" + stuByScoreGroup.get(key));
 }
-// [1-1][HIGH]. 1학년 1반은 HIGH
+// [1-1][HIGH]
 // [2-1][HIGH]
 // [1-2][MID, LOW]
 // [2-2][MID, LOW]
@@ -670,60 +663,8 @@ if(Optional.ofNullalbe(str).isPresent()){
 }
 ```
 
-## <span style="color:#802548">_net vs net.http_</span>
-
-- net 
-
-```java
-// Verbose, stream-based, and synchronous only
-URL url = new URL("https://example.com");
-HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-conn.setRequestMethod("GET");
-
-try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
-    StringBuilder response = new StringBuilder();
-    String line;
-    while ((line = reader.readLine()) != null) {
-        response.append(line);
-    }
-    System.out.println(response.toString());
-}
-```
-
-- net.http
-
-```java
-// Readable, Builder pattern, and supports Async/HTTP2
-HttpClient client = HttpClient.newHttpClient();
-HttpRequest request = HttpRequest.newBuilder()
-    .uri(URI.create("https://example.com"))
-    .GET()
-    .build();
-
-// Simple one-liner to get the body as a String
-HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-System.out.println(response.body());
-```
-
-
-- io
-
-```java
-// Manual buffer management is required
-File source = new File("old.txt");
-File dest = new File("new.txt");
-
-try (InputStream in = new FileInputStream(source);
-     OutputStream out = new FileOutputStream(dest)) {
-    byte[] buffer = new byte[1024];
-    int length;
-    while ((length = in.read(buffer)) > 0) {
-        out.write(buffer, 0, length);
-    }
-} catch (IOException e) { e.printStackTrace(); }
-```
-
-- nio
+## <span style="color:#802548">_nio2 package_</span>
+- fileじゃなく、Path+Files+Pathsを使う
 
 ```java
 // One method call that uses OS-level optimization
@@ -735,3 +676,182 @@ try {
 } catch (IOException e) { e.printStackTrace(); }
 ```
 
+- Path クラスの用例は以下となる
+- パスがなければ、作成する
+
+```java
+Path newPath = Path.of("logs/app.log"); 
+// Joining parts (handles slashes for you automatically)
+Path docPath = Path.of("C:", "Users", "Docs", "notes.txt"); 
+if (Files.notExists(path)) {
+    // 2. Create the directory along with any missing parent folders
+    Files.createDirectories(path);
+    System.out.println("Directory structure created: " + path.toAbsolutePath());
+} 
+```
+
+- 生成してファイルがあるとして、属性を見たいとき
+
+```java
+if (Files.exists(filePath)) {
+    try {
+        BasicFileAttributes attr = Files.readAttributes(filePath, BasicFileAttributes.class);
+
+        System.out.println("Is Regular File: " + attr.isRegularFile());
+        System.out.println("Is Directory:    " + attr.isDirectory());
+        System.out.println("File Size:       " + attr.size() + " bytes");
+        System.out.println("Created On:      " + attr.creationTime());
+        System.out.println("Last Modified:   " + attr.lastModifiedTime());
+
+    } catch (IOException e) {
+        System.err.println("Failed to read file attributes: " + e.getMessage());
+    }
+} else {
+    System.out.println("File does not exist at target path.");
+}
+```
+
+- ofじゃなく、getでもファイルのパスを指定できる
+- ファイルの名前とそのパスについてわかることができる
+
+```java
+Path baseDir = Paths.get("/home/user");
+Path fullPath = baseDir.resolve("documents/resume.pdf");
+Path fileName = fullPath.getFileName(); // resume.pdf
+Path fileParent = fullPath.getParent(); // /home/user/documents
+```
+
+
+- ファイルの編集権限なども確認できる
+
+```java
+boolean isWritable = Files.isWritable(myPath);
+boolean isHidden = Files.isHidden(myPath);
+long size = Files.size(myPath); // Size in bytes
+```
+
+- ファイルの直接的操作
+
+```java
+// Copy (REPLACE_EXISTING allows overwriting the target)
+Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+
+// Move/Rename
+Files.move(source, target);
+
+// Delete (Throws exception if file doesn't exist)
+Files.delete(target);
+```
+
+- ファイルをコピーするときのプロセス
+
+```java
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.util.Set;
+
+public class SecurityCopyDemo {
+
+    public static void checkPrivilegeAndCopy(Path source, Path target) {
+        try {
+            // 1. Check if the file physically exists first
+            if (Files.notExists(source)) {
+                System.out.println("Error: Source file does not exist.");
+                return;
+            }
+
+            // 2. Detect if the file lacks write permissions
+            if (!Files.isWritable(source)) {
+                System.out.println("File is read-only. Attempting to grant write privileges...");
+                grantWritePrivilege(source);
+            }
+
+            // 3. Ensure the destination's parent folder exists
+            if (target.getParent() != null && Files.notExists(target.getParent())) {
+                Files.createDirectories(target.getParent());
+            }
+
+            // 4. Perform the copy operation (REPLACE_EXISTING handles overwrites)
+            Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+            System.out.println("File successfully copied to: " + target);
+
+        } catch (IOException e) {
+            System.err.println("Operation failed: " + e.getMessage());
+        }
+    }
+
+    private static void grantWritePrivilege(Path path) throws IOException {
+        String os = System.getProperty("os.name").toLowerCase();
+
+        if (os.contains("win")) {
+            // Windows Approach: Use legacy File wrapper mapping fallback
+            path.toFile().setWritable(true, false); // true = writable, false = for all users
+            System.out.println("Windows write attribute applied.");
+        } else {
+            // Linux / Unix / macOS Approach: Use explicit POSIX permissions
+            try {
+                // Read current permissions
+                Set<PosixFilePermission> perms = Files.getPosixFilePermissions(path);
+                
+                // Append Owner and Group write bits
+                perms.add(PosixFilePermission.OWNER_WRITE);
+                perms.add(PosixFilePermission.GROUP_WRITE);
+                
+                // Update file configuration on disk
+                Files.setPosixFilePermissions(path, perms);
+                System.out.println("POSIX write permissions (Owner/Group) applied.");
+            } catch (UnsupportedOperationException e) {
+                // Safe fallback if filesystem does not support POSIX views
+                path.toFile().setWritable(true, false);
+            }
+        }
+    }
+
+    public static void main(String[] args) {
+        Path src = Path.of("restricted.txt");
+        Path dest = Path.of("backup", "restored.txt");
+        
+        checkPrivilegeAndCopy(src, dest);
+    }
+}
+```
+
+
+- ファイルを読み込むときのプロセス
+- newBufferedReaderはエンコーディングを指定できる
+
+```java
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.io.BufferedReader;
+import java.io.IOException;
+
+public class LargeFileProcessor {
+    public static void main(String[] args) {
+        Path largeFile = Path.of("huge_data.log");
+
+        // Try-with-resources ensures the reader is closed automatically
+        try (BufferedReader reader = Files.newBufferedReader(largeFile, StandardCharsets.ISO_8859_1)) {
+            String line;
+            // Reads only one line into memory at a time
+            while ((line = reader.readLine()) != null) {
+                // Process your data here
+                if (line.contains("ERROR")) {
+                    System.out.println("Error found: " + line);
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+
+- nio2のPathクラスたちの長所は以下となる
+    - エラーハンドルがちゃんとできてる
+    - シンボリックリンクを扱える
+    - 一括操作や全般的なパフォーマンスに優れる
