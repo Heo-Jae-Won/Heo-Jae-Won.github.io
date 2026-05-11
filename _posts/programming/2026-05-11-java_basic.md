@@ -1,3 +1,9 @@
+---
+title: "Java_API"
+published: true
+categories: [lang]
+---
+
 ## <span style="color:#802548">_JDK変化の主要変化_</span>
 1.2：コレクションフレームワーク (Collection Framework)
 1.4：NIOパッケージ（Pathクラス用ユーティリティのFiles、新機軸のブロックI/OであるPath、ノンブロッキングI/OのChannels）
