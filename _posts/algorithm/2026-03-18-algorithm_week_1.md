@@ -25,22 +25,6 @@ categories: [algorithm]
     - 比較のための２個目のFor文
 - ダブルFor文なので、O（ｎ２）になる
 
-```java
-int[] abc = { 0, 1, 7, 2, 13, 15, 6 };
-int max = abc[0];
-for (int i = 0; i < abc.length; i++) {
-    for (int j = 1 + i; j < abc.length; j++) {
-        if (max <= abc[j]) {
-            max = abc[j];
-        }
-    }
-}
-```
-
-- go langではJavaと宣言とか、データ型を決める方法が違う
-    - 関数も大文字にする必要がある。
-    - パラメータも Arrayじゃなくて、Sliceタイプを使うようになる
-
 ```go
 func FindMaxValue(arr []int) int {
 	max := arr[0]
@@ -59,20 +43,6 @@ func FindMaxValue(arr []int) int {
 
 - 最小限の値を探索
 - 上と同じ。ただ以上の方向が変わっただけ
-
-```java
-int[] abc = { 3, 1, 7, 2, 13, 15, 6 };
-int min = abc[0];
-for (int i = 0; i < abc.length; i++) {
-    for (int j = 1 + i; j < abc.length; j++) {
-        if (min >= abc[j]) {
-            min = abc[j];
-        }
-    }
-}
-```
-
-- go lang
 
 ```go
 func FindMinValue(arr []int) int {
@@ -99,15 +69,6 @@ func FindMinValue(arr []int) int {
 - 時間計算量は n/2なので O(n)になる
     - n / 2になる理由は前半だけを見て後半と比較すると後半の要素はループが不要
 
-```java
-int[] abc = {0,1,7,2,4,13,6};
-for(int i = 0; i < abc.length / 2; i++) {
-    int temp = abc[i];
-    abc[i] = abc[abc.length - 1 -i];
-    abc[abc.length - 1 -i] = temp;
-}
-```
-
 ```go
 func ReverseArray(arr []int) {
 	for i := 0; i < len(arr)/2; i++ {
@@ -119,23 +80,6 @@ func ReverseArray(arr []int) {
 - ただ、不変性が重要なので、不変性を担保するために、新しいオブジェクトを返すことにする
 - 今回はプリミティブ型なので、Cloneでも問題はないが、参照型としたら、シャローコピーになってしまう。
 - ディープコピーにするためにはFor文でループしながら１つづつコピーするしかない
-
-```java
-public int[] returnReversedArray(int[] arr) {
-    int newArr = arr.clone();
-    for(int i = 0; i < newArr.length / 2; i++) {
-        int temp = newArr[i];
-        newArr[i] = newArr[newArr.length - 1 -i];
-        newArr[newArr.length - 1 -i] = temp;
-    }
-}   
-
-Integer[] newArr = new Integer[arr.length];
-for (int i = 0; i < arr.length; i++) {
-    newArr[i] = arr[i].clone(); //オブジェクトの時
-}
-```
-
 - プリミティブ型はただのシャロ―コピーもディープコピーと同じ効果が現れる
 - makeはJavaに例えれば、newと同じ
 - Copyは以下のFor文と同じ効果
@@ -146,9 +90,6 @@ func ReturnNewReverseArray(arr []int) []int {
 
     newArray := make([]int, len(arr)) //ーーー＞ディープコピー
     copy(newArray, arr)
-    /*for i := range arr {
-        newArray[i] = arr[i]
-    }*/
 
 	for i := 0; i < len(newArray)/2; i++ {
 		newArray[i], newArray[len(arr)-1-i] = newArray[len(newArray)-1-i], newArray[i]
@@ -163,72 +104,28 @@ func ReturnNewReverseArray(arr []int) []int {
 - 選択ソート昇順
 - If文で比較の対象が abc[i] じゃなくて、abc[minValueIdx]になる理由は、実際に最小値を見つけたとき、minValueIdxが変わるからだ
 
-```java
-public static void main(String[] args) throws Exception {
-    int[] abc = { 3, 1, 7, 2, 13, 15, 6 };
-    int minValueIdx = abc[0];
-    for (int i = 0; i < abc.length; i++) {
-        for (int j = 1 + i; j < abc.length; j++) {
-            if (abc[minValueIdx] > abc[j]) {
+```go
+func getMinValue() int {
+    arr := []int{3, 1, 7, 2, 13, 15, 6}
+    for i := range arr {
+        minvalueIdx = i;
+        for j := 1 + i; i < arr.length; j++ {
+            if arr[minValueIdx] > arr[j] {
                 minValueIdx = j;
             }
         }
 
-        int temp = abc[i];
-        abc[i] = abc[minValueIdx];
-        abc[minValueIdx] = temp;
+        arr[i] , arr[minValueIdx] = arr[minValueIdx], arr[i]
     }
+
+    fmt.Println(arr)
 }
 ```
 
 ## <span style="color:#802548">_実装ー選択ソート降順_</span>
 
 - 選択ソート降順
-- if文の方向だけ変えればいい
-
-```java
-public static void main(String[] args) throws Exception {
-    int[] abc = { 3, 1, 7, 2, 13, 15, 6 };
-    int maxValueIdx = abc[0];
-    for (int i = 0; i < abc.length; i++) {
-        for (int j = 1 + i; j < abc.length; j++) {
-            if (abc[maxValueIdx] <= abc[j]) {
-                maxValueIdx = j;
-            }
-        }
-
-        int temp = abc[i];
-        abc[i] = abc[maxValueIdx];
-        abc[maxValueIdx] = temp;
-    }
-}
-```
-
-- 不変性を担保するため、新しい配列を返す
-
-```java
-public static void main(String[] args) throws Exception {
-    int[] abc = { 3, 1, 7, 2, 13, 15, 6 };
-    int[] sortedArray = abc.clone();
-
-    int maxValueIdx = sortedArray[0];
-    for (int i = 0; i < sortedArray.length; i++) {
-        for (int j = 1 + i; j < sortedArray.length; j++) {
-            if (sortedArray[maxValueIdx] <= sortedArray[j]) {
-                maxValueIdx = j;
-            }
-        }
-
-        int temp = sortedArray[i];
-        sortedArray[i] = sortedArray[maxValueIdx];
-        sortedArray[maxValueIdx] = temp;
-    }
-    
-    System.out.println(Arrays.toString(sortedArray));
-}
-```
-
-- go lang
+- if文の矢印の方向だけ変えればいい
 
 ```go
 func SelectionSort(arr []int) []int {
