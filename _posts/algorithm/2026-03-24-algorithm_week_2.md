@@ -21,34 +21,29 @@ categories: [algorithm]
 ## <span style="color:#802548">_実装ーfactorial_</span>
 
 - 最初に実装したFactorial
-- グローバル変数が必要
+- 別途の aという変数が必要だった
 
-```java
-public static int factorial(int n) {
-    a = a * n;
+```go
+func Factorial(n int) {
+    a := a * n;
     if (n > 1) {
-        factorial(n - 1);
+        Factorial(n - 1);
     }
 
     return a;
-} 
+}
 ```
 
-- AIに上のコードを投げて得られたものだけど、かなり違いがあってどこでこのようなロジックの違いが起こったのか考えてみた
-    - グローバル変数が必要ではない関数に書き換える
-    - 数学的には F(n) = n * F(n-1)なので、戻り値も左のような形になる
-        - そこでベースケースまで考えが及ばなかった
-        - そもそもベースケースの定義を間違っていて、停止じゃなくて、持続の条件として使っていた
-    - factorial(0)が０ではないことを認識していなかった
-        - 例えば、factorial(6)は 6 x 5 x 4 x 3 x 2 x 1 x factorial(0)になる
-        - factorial(0)で停止するので、 0 x fatorial(-1)じゃなくて、１をリターンする
+- どうしても a という変数をなくしたかった
+- 工夫した結果、以下のように return文で直接 n を利用すればいい
 
-```java
-public static int factorial(int n) {
-    if (n  < 1) {
-        return 1;
-    }
-    return n * factorial(n - 1);
+```go
+func Factorial(n int) int {
+	if n < 1 {
+		return 1
+	}
+
+	return n * Factorial(n-1)
 }
 ```
 
@@ -62,20 +57,6 @@ public static int factorial(int n) {
     return n * factorial(n - 1);
 }
 ```
-
-- go lang version
-- nが1未満よりは０になった時がもっと理解しやすいと思い、書き換えた
-
-```go
-func Factorial(n int) int {
-	if n-1 < 0 {
-		return 1
-	}
-
-	return n * Factorial(n-1)
-}
-```
-
 
 ## <span style="color:#802548">_実装ーfibonacchi数列再帰_</span>
 
