@@ -706,17 +706,11 @@ public class Status
 ```
 
 ## <span style="color:#802548">_C# DBConetxt: configuration_</span>
-
-
-
-
-
-
 - after configuration Entity, then it's better making a GetContext util method
 - this is version of localhost
 
 ```C#
-public class DbUtil {
+public class TestUtil {
 
     public static MyDbContext GetContext() 
     {
@@ -729,6 +723,29 @@ public class DbUtil {
 }
 
 ```
+
+## <span style="color:#802548">_C# DBConetxt: executeSQLRaw_</span>
+
+```C#
+string sql = @"
+    INSERT INTO TRN_SLIP_JOURNAL (
+        FUND_CODE
+    )
+    VALUES (
+        @FunDCode,
+    )
+";
+
+foreach (var row in rows) {;
+    _dbContext.Database.ExecuteSqlRaw(
+        sql,
+        new SqlParameter("@FundCode", row.fundCode);
+        new SqlParameter("@ProgramId", row.programID == null ? DBNull.Value : row.programId);
+    )
+}
+```
+
+
 
 
 
@@ -755,7 +772,7 @@ public class AServiceTest {
 
     public AServiceTest()
     {
-        _configuration = new ConfigurationBuilder().AddJsonFile($"@appsettings.json", optional: false);
+        _configuration = new ConfigurationBuilder().SetBasePath(Directory.GetCurrentDirectory()).AddJsonFile(Path.Combine(projectRootDir, "appsettings.json"), false, false).Build();
         _userInfo = new UserInfo()
         {
             UserId = "101",
@@ -776,7 +793,7 @@ public class AServiceTest {
                 .As<UserInfo>();
         buidler.RegisterInstance(_serviceInfo)
                 .As<ServiceInfo>();
-        builder.Register(C => DbUtil.GetContext())
+        builder.Register(C => TestUtil.GetContext())
                 .As<MyDbContext>()
                 .InstancePerLifetimeScope();
 
@@ -824,7 +841,7 @@ public void TestCase1004()
     context.Database.ExecuteSql($"truncate table Table1");
     context.ChangeTracker.Clear();
 
-    context.Table1Entity.AddRange(DbUtil.ReadDataFromCsv<Table1>)("Service/MyService/Data/Table1/Table1_testcase_1004.csv");
+    context.Table1Entity.AddRange(TestUtil.ReadDataFromCsv<Table1>)("Service/MyService/Data/Table1/Table1_testcase_1004.csv");
     context.SaveChanges();
 
     MyService.myServiceMethod1("1","2","3");
@@ -832,7 +849,98 @@ public void TestCase1004()
 ```
 
 
+## <span style="color:#802548">_Java and C# : UNIT TEST_</span>
+- service logic consists of 5 repo and 20 queries with if statement
+- but test case of service logic care about just 1 query and doesnt have a concern about service itself
+- in other hand, test case is not about service flow so test data not exists
+- in this case, Mock must be used 
+    - we cannoot implement only used methods
+    - so if we dont use it in that case, just thorw exception 
 
+```C#
+internal class TestAMockRepository : IARepository
+{
+    public IList<AEntity> getEnttiy() 
+    {
+        throw new NotImplementedException();
+    }
+
+    public AEntity? getEntityForClosing()
+    {
+        return new () 
+        {
+            SequeceNo = 0,
+            TransactionNumber = "",
+        }
+    }
+}
+```
+
+
+- as u deciding mock, u must register it in Config
+- but in this case, not in constructor Builder, cuz this mockservice is used in specific case
+
+```C#
+[Fact]
+public void testCase1001()
+{
+    using var scope = _container.BeginLifetimeScope(builder => {
+        builder.RegisterType<TestAMockRepository>()
+                .As<IARepository>
+                .InstancePerLifetimeScope();
+    })
+}
+```
+
+- if case is for using some mock method and using real repo methods, then below pattern is recommended
+
+```C#
+internal class TestCMockRepository : ICUpdateRepository
+{
+    private readonly CUpdateRepository _realRepository;
+
+    public TestCUpdateMockRepository(
+        CUpdateRepository realRepository
+    )
+    {
+        _realRepository = realRepository;
+    }
+
+    public void CancelCredit()
+    {
+        return;
+    }
+
+    public bool CancelLoan()
+    {
+        return false;
+    }
+
+    public void UpdateCredit()
+    {
+        _realRepository.UpdateCredit();
+    }
+}
+```
+
+- then, 2 each service must be registerd in specific test config
+- not just Mock, but also real one must be registerd in config
+- if not registering, circular dependency injection problem arises
+
+```C#
+[Fact]
+public void testCase1001()
+{
+    using var scope = _container.BeginLifetimeScope(builder => {
+        builder.RegisterType<TestCMockRepository>()
+                .As<ICUpdateRepository>
+                .InstancePerLifetimeScope();
+        builder.RegisterType<CUpdateRepository>()
+                .As<CUpdateRepository>
+                .InstancePerLifetimeScope();
+    })
+}
+```
 
 
 
@@ -869,7 +977,7 @@ public void TestCase1004()
 
 
 ```C#
-public class DbUtil {
+public class TestUtil {
     public static IList<T> ReadDataFromCsv<T>(string filepath) 
     {
         string projDir = GetProjectRootDir();
