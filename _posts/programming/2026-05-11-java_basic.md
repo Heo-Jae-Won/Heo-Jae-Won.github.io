@@ -242,6 +242,154 @@ enum PayrollDay {
 ```
 
 
+- クラス分けにもEnumが使われる
+- 最初のロジックは以下のように実装された
+- 動くパターンにより、Enemyクラスが変更されてしまうので、維持保守にはよくないパターンだ
+
+```java
+public class Enemy extends Character {
+    private int pathPattern;
+
+    public Enemy(int pathPattern) {
+        this.pathPattern = pathPattern;
+    }
+
+    public void draw() {
+        if (pathPattern == 1) {
+            x += 4;
+        } else if (pathPatttern == 2) {
+            y += 100;        
+        } else if (pathPattern == 4 ) {
+            x += 4;
+            y += 10;
+        }
+        .
+        .
+        .
+        
+    }
+}
+```
+
+- クラスを分離させる
+- 問題はXとYのロジックも分離されてしまうことだ
+
+```java
+public class PathPattern {
+    private int patternId;
+
+    public PathPattern(int patternId) {
+        this.patternId = patternId;
+    }
+
+    public int nextX(int currentX) {
+        switch (patternId) {
+            case 1:
+            case 4: 
+                return currentX + 4;
+            default: 
+                return currentX; 
+        }
+    }
+
+    public int nextY(int currentY) {
+        switch (patternId) {
+            case 2: 
+                return currentY + 100;
+            case 4: 
+                return currentY + 10;
+            default: 
+                return currentY; 
+        }
+    }
+}
+
+public class Enemy extends Character {
+    private PathPattern pathPattern;
+
+    public Enemy(int pathPatternId) {
+        this.pathPattern = new PathPattern(pathPatternId);
+    }
+
+    public void draw() {
+        this.x = pathPattern.nextX(this.x);
+        this.y = pathPattern.nextY(this.y);
+		...
+    }
+}
+```
+
+
+- そういった問題も解決できる方法はEnumだ
+- Enum内にXとYがまとまって一緒に見える
+- 分岐がなくなるところもよいところ
+
+```java
+public enum PathPattern {
+    
+    PATTERN_1(1) {
+        @Override
+        public int nextX(int currentX) { return currentX + 4; }
+        @Override
+        public int nextY(int currentY) { return currentY; }
+    },
+    
+    PATTERN_2(2) {
+        @Override
+        public int nextX(int currentX) { return currentX; }
+        @Override
+        public int nextY(int currentY) { return currentY + 100; }
+    },
+    
+    PATTERN_4(4) {
+        @Override
+        public int nextX(int currentX) { return currentX + 4; }
+        @Override
+        public int nextY(int currentY) { return currentY + 10; }
+    },
+    
+    STATIONARY(0) {
+        @Override
+        public int nextX(int currentX) { return currentX; }
+        @Override
+        public int nextY(int currentY) { return currentY; }
+    };
+
+    private final int id;
+
+    PathPattern(int id) {
+        this.id = id;
+    }
+
+    public abstract int nextX(int currentX);
+    public abstract int nextY(int currentY);
+
+    public static PathPattern fromId(int id) {
+        for (PathPattern pattern : values()) {
+            if (pattern.id == id) {
+                return pattern;
+            }
+        }
+        return STATIONARY; // fallback処理
+    }
+}
+
+public class Enemy extends Character {
+    private PathPattern pathPattern;
+
+    public Enemy(int pathPatternId) {
+        this.pathPattern = PathPattern.fromId(pathPatternId);
+    }
+
+    public void draw() {
+        this.x = pathPattern.nextX(this.x);
+        this.y = pathPattern.nextY(this.y);
+		....
+    }
+}
+```
+
+
 
 ## <span style="color:#802548">_ジェネリクスのワイルドカードの再使用性_</span>
 - sortというメソッドがジェネリクスを調べるためのいい例だ
