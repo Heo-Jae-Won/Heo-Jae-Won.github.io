@@ -191,6 +191,8 @@ function displayPageEntryBlockPopup
 - 일단은 애매하게 compute로 해놨는데, 
 - computedValidationResult --> determineValidationResult
 - 아니면
+
+```text
 evaluateValidationResult
 
 preventPageEntry()
@@ -201,3 +203,40 @@ showPageEntryBlockPopup()
 
 
 showErrorPopup --> showEntryBlockPopup
+```
+
+
+
+널(Null) 처리: 함수의 매개변수에 널이 들어올 수 있으면 변수 이름에 'Nullable'을 명시합니다. 반환값도 마찬가지로 'Nullable'을 명시합니다. 함수 내부에서는 널이 아닌 값을 가정하고 코딩하며, 널 체크는 바운더리에서만 수행합니다. 이를 통해 코드의 가독성을 높이고 오류를 줄일 수 있습니다.
+
+
+함수명은 함수의 기능이 아니라 목적을 요약하는거구나
+
+함수의 내용이 유저 어카운트가 생성된지 7일 미만이면 true 7일 이상이면 false를 반환
+함수명은 isUserCreatedWithin7Days -->날짜를 매개변수로 받게 바꾸면 method명 바꿔야하는 거 아님?
+그리고 이 함수의 목적은, 특정한 날짜에만 구매 페이지를 열어주는데, 새로 생긴 유저는 유예기간을 주자는 목적.
+그러면 여기 내부 구현을 봐도 왜 하는 건지 모름.. 근데 함수 호출자의 입장에선 7일을 뉴 유저라고 하고,
+이제 함수 이름은 isNewUser라고 하면 되는거임. 새 유저를 판단하는 기준이 7일이란 걸 모르면 망하는 거임..
+
+내부 데이터가 어떻게 저장되어 있는지 함수 호출자에선 몰라도 됨. 그렇기에 isNewUser라고 해야됨..
+And나 Or를 함수명에 넣는 순간, 아마도 내부적으로 하는 procedure를 나열만 했을 가능성이 높음.
+나중에 호출자가 이 함수를 재활용할 수 있는 가능성이 너무 적어짐.
+
+
+- 시작일은 포함인데, 끝날은 포함되지 않을 수 있다. 이럴 때 begin과 end를 변수명으로 쓴다. 체크인을 생각해보자. 
+
+```javascript
+function reservationDate('2023-11-06','2023-11-07');
+
+const beginDate = "yyyy-mm-dd";
+const endDate = "yyyy-mm-dd";
+function reservationDate(beginDate, endDate);
+```
+
+- 포함된 양 끝을 first와 last를 의미하는데, 보통 연속된 값이 아닐 때 쓴다.
+
+```javascript
+const students = ['포코','존','현석'];
+
+function getStudents(firstStudent, lastStudent);
+```

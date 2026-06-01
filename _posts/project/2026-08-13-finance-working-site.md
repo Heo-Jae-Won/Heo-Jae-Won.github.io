@@ -165,6 +165,12 @@ public class UserDTO
 ```
 
 
+## <span style="color:#802548">_C# DBcontext : FromSQL<>()_</span>
+
+- u can use dbcontext and SQL with FROMSQL
+- but it doesnt support projection
+
+
 ## <span style="color:#802548">_C# DBcontext : no ToList() for 1 row_</span>
 
 - ToList() is also not needed for getting just 1 row
@@ -942,6 +948,70 @@ public void testCase1001()
 }
 ```
 
+
+
+
+## <span style="color:#802548">_Java and C# : EMPTY CLLECTION_</span>
+
+```C#
+Enumerable.Empty<T>();  //Enumerable
+ImmutableList<T>.Empty  //List
+Array.Empty<T>();       //array
+```
+
+
+## <span style="color:#802548">_Java and C# : MAX() LINQ_</span>
+
+- when there is no matching value and ChangeData entity property is not null, null exception occurs
+
+```C#
+DateOnly? maxChangeDate = dbContext.Enttiy.Max(x => x.ChangeDate);
+```
+
+- so in order to detour this problem, needs Order by and select first one
+
+```C#
+DateOnly? maxChangeDate = dbContext.Enttiy.OrderByDescending(x => x.ChangeDate).Select(x => x.ChangeDate).FirstOrDefault;
+```
+
+- and then, u composite that query to another query, which means subquery
+
+```C#
+DateOnly? maxChangeDate = dbContext.Enttiy.OrderByDescending(x => x.ChangeDate).Select(x => x.ChangeDate).FirstOrDefault;
+
+var query = dbContext.Enttiy.where(x=> x.ChangeDate == maxChangeDate);
+var totalCount = query.Count();
+```
+
+- but the problem is that, when maxChangeDate becomes null, these query object would be null
+- so below gonna be exception, cuz there is no 1 record
+
+```C#
+var result = query.Select(entity => new Entity(){
+    SequecneNo = entity.SequenceNo,
+    TotalCount = totalCount
+}).First();
+```
+
+- in this case, we need to use FirstOrDefault()
+
+```C#
+var result = query.Select(entity => new Entity(){
+    SequecneNo = entity.SequenceNo,
+    TotalCount = totalCount
+}).FirstOrDefault() 
+```
+
+- and null in object is equlas to no count in DB. so we can translate it into like below using ?? opeartor
+
+```C#
+var result = query.Select(entity => new Entity(){
+    SequecneNo = entity.SequenceNo,
+    TotalCount = totalCount
+}).FirstOrDefault() ?? new Entity() {
+    TotlaCount = 0
+}
+```
 
 
 

@@ -102,6 +102,10 @@ git rebase --abort
 git pull
 ```
 
+## <span style="color:#802548">_when do git force push, rejected_</span>
+[rejected] branch -> branch(stale info) ---> this occurs cuz u pushed another commit from another PC.
+            so u need to reset hard and pull ur own bracnh.
+
 ## <span style="color:#802548">_when do git pull with dev remote_</span>
 
 ```shell
