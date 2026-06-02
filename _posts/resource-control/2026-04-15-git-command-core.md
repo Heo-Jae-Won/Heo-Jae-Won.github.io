@@ -14,14 +14,43 @@ git pull origin develop --rebase -p --autostash -->O
 git pull origin/develop --rebase -p --autostash-->X
 ```
 
+## <span style="color:#802548">_how can i know where my branch is from_</span>
 
-## <span style="color:#802548">_clone branch_</span>
-
-- branch clone
+- if u are not sure which branch is ur original branch, below is recommended
+- but the problem is that, it shows commit even if my branch is from develop/AService
+    - cuz develop/AService is from develop
+    - but dont worry. if ur branch is from develop, then git merge-base --fork-point [develop/AService] doesnt show commit
 
 ```shell
-git clone -branch <branchname>  <remote-repo-url>
+git merge-base --fork-point [develop/AService]
+git merge-base --fork-point [develop]
 ```
+
+- below is the process
+- if ur branch is from develop/AService, u can see Z commit
+
+```text
+develop          o---o---A---B---C (develop keeps moving)
+                         \
+develop/AService          X---Y---Z (AService split from A)
+                                   \
+your-branch                         1---2 (You split from Z)
+```
+
+- if ur branch is from develop, u can see C commit
+
+```text
+develop          o---o---A---B---C (develop keeps moving)
+                                   \
+your-branch                         1---2 (You split from C)
+```
+
+```
+git show-branch
+```
+
+## <span style="color:#802548">_update remote branch_</span>
+
 
 - getting remote info
 - updating remote branch info
@@ -29,7 +58,6 @@ git clone -branch <branchname>  <remote-repo-url>
 
 ```shell
 git fetch origin --prune
-git branch -r   
 git switch [remote branch]
 ```
 
@@ -86,8 +114,12 @@ fixup 72a1
 
 
 ## <span style="color:#802548">_when do git force push, rejected_</span>
-[rejected] branch -> branch(stale info) ---> this occurs cuz u pushed another commit from another PC.
-            so u need to reset hard and pull ur own bracnh.
+```
+[rejected] branch -> branch(stale info) 
+```
+
+- this occurs cuz u pushed another commit from another PC.
+- so u need to reset hard and pull ur own bracnh.
 
 ## <span style="color:#802548">_remove local change_</span>
 
@@ -270,25 +302,6 @@ de12b0e (origin/main, origin/HEAD, main) commit
 785cd77 (HEAD -> feature/authority-profile) Feat: generate role
 ```
 
-- (feature/dev_wsg) and (origin/feature/dev_wsg) is diverged
-- it means local has more ahead commit 
-
-```sh
-82174d3 (feature/dev_wsg) fix: exclude deactivated account#2
-8339e87 fix: exclude deactivated account
-afdfd6d add: search word option(=address)
-35d69ef (origin/feature/dev_wsg) adding profile path
-```
-
-- 8957fea origin/hotfix/add-db-tls doesnt be written (origin/hotfix/add-db-tls, hotfix/add-db-tls)
-    - in this case, origin/hotfix/add-db-tls is not about ahead or behind when there is no hotfix/add-db-tls in commit log
-    - it means that i dont publish hotfix/add-db-tls on my local 
-
-```sh
-8957fea (origin/hotfix/add-db-tls) add-db-enable-tls
-```
-
-
 
 ## <span style="color:#802548">_merge and ff_</span>
 
@@ -333,32 +346,6 @@ A — B — C — D — G
             E — F
 ```
 
-- if u want flow like below,
-
-```sh
-A — B — C — D — G — E' — F'
-```
-
-- rebase is needed
-
-```sh
-git switch feature
-git rebase main
-```
-
-- then when ff is possible?
-- when no advanced commit on main exists, ff is possible
-
-```sh
-main:    A — B — C
-feature:          D — E
-```
-
-- if merging operation is finished, git status shows like this message
-
-```sh
-up to date
-```
 
 
 ## <span style="color:#802548">_credential manager initialization_</span>
