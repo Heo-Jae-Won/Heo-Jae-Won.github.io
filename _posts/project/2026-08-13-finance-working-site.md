@@ -168,8 +168,74 @@ public class UserDTO
 ## <span style="color:#802548">_C# DBcontext : FromSQL<>()_</span>
 
 - u can use dbcontext and SQL with FROMSQL
-- but it doesnt support projection
+- FromSQl's parameter must be a DbSet object
+- but it does support db level of projection like specifying selected columns
+- but it cannot be used as a DTO projection like SqlQuery
 
+
+## <span style="color:#802548">_C# module resistration_</span>
+- registration order is always like below
+- it means, if someone requests Interface, create and provide ImplClass
+
+```C#
+builder.RegisterType<-----ImplClass>().As<------InterfaceClass>
+```
+
+
+## <span style="color:#802548">_C# ref_</span>
+
+- in C#, u should try to avoid ref keyword
+- in almost cases, ref doesnt be needed
+- setter doesnt need ref keyword, cuz copy is passed by parameter
+
+```C#
+private void setResponseData(
+    ref ResponseModel responseModel,
+    CancelInfo cancelInfo
+)
+
+setResponseData(ResponseModel responseModel) {
+    responseModel.a = a;
+    responseModel.b = b;
+    responseModel.c = c;
+    responseModel.d = d;
+}
+```
+
+- it can have a meaning if u need to do a new initilazation in one method and after returning, u want to continue logic with that model
+- but just setter logic already passes address as a parameter, so it is no effect
+
+```C#
+void SetResponseData(ResponseModel respponseModel) {
+    respponseModel = new ResponseModel();
+}
+
+public ServiceLogic() {
+    ResponseModel responsModel = new ResponseModel();
+    setResponseData(responseModel);
+
+    repoCall(responseModel);
+}
+```
+
+- and it's better to return a new initialized model rather than ref
+
+```C#
+private ResponseModel setResponseDataAndReturnModel(ResponseModel responseModel) {
+    responseModel = new ResponseModel();
+    responseModel.a = a;
+    ...
+
+    return responseModel
+}
+
+public ServiceLogic() {
+    ResponseModel responsModel = new ResponseModel();
+    responsModel = setResponseDataAndReturnModel(responseModel);
+
+    repoCall(responseModel);
+}
+```
 
 ## <span style="color:#802548">_C# DBcontext : no ToList() for 1 row_</span>
 
@@ -1080,38 +1146,75 @@ public class TestUtil {
         return data;
     }
 }
-
 ```
 
+## <span style="color:#802548">_C# dbcontext : scoped_</span>
+- DBcontext is basically scoped
+    - scoped means new instance for every request.0
+- if not scoped, there would be some serious problems
+- when dbContext is not scoped, they share same dbcontext
+- and it will cause problems even repoo doesnt touch shared object
+- cuz DbContext is not thread-safe, so state in dbContext would be corrupted
+    - both attempts tracker and identity map dictionary 
 
-## <span style="color:#802548">_project_</span>
-
-
-```
-***우선 package 구조부터 살펴보기. 
-1. 각 프로젝트 별로 있을 수도 like NTT (배치1, 배치2, 배치3, 배치4....)
-2. 기능 별로 패키지 나눌 수도 like 日証金 (service, common service, web, repository, batch)
-
-***DB 연결 방법 살펴보기.
-repository는 ORM과 SQL mapper 뭘 쓰나 살펴보기.
-ORM과 SQL mapper 중 쓸 수 있는 거 보고, 간편하게 쓸 수 있는 지 찾아보기
-create, update 등은 많은 컬럼을 나열하는 개노가다 model class 작성작업을 하지 않게끔 ORM을 쓸 수 있다면 금상첨화
-
-***에러 메시지 처리 방법에 대해 알아보기.
-error handling이 자동으로 다뤄지는지 ?
-자동이라면 어떻게 자동으로 다뤄지는지 ? 
-
-***로그 찍는 법에 대해 알아보기.
-로그를 찍으면 어디에 로그가 저장되는지 ?
-
-***테스트 방법에 대해 알아보기.
-테스트는 unit test를 사용하는지?
-아니면 그냥 화면단 테스트만 진행하는지?
-
-***git 관리에 대해 알아보기.
-내가 작성할 브랜치 이름의 명명규칙이 어떻게 되는지?
-어떤 브랜치를 기준으로 분기해야하는지?
-언제 기준 브랜치로 merge를 해야하는지?
-git PR을 날리는지? 아니면 그냥 merge로 전부 처리하는지?
+```C#
+await Task.WhenAll(
+    repo.GetUserAsync(1),
+    repo.GetUserAsync(2),
+)
 ```
 
+- buf even if scoped, above code is dangerous
+
+
+
+- right form of pararellism is like below
+- not dbContext, but IDbContextFactory in repo
+
+```C#
+public class UserRepository : IUserRepository
+{
+    private readonly IDbContextFactory<AppDbContext> _contextFactory;
+
+    public UserRepository(IDbContextFactory<AppDbContext> contextFactory)
+    {
+        _contextFactory = contextFactory;
+    }
+
+    public async Task<User> GetUserAsync(int id)
+    {
+        using var context = await _contextFactory.CreateDbContextAsync();
+        return await context.Users.FindAsync(id);
+    }
+}
+```
+
+- this is service logic
+
+```C#
+public class UserSerivce 
+{
+    public async Task<(List<User> Users, List<Order> Orders)> getUserAsync(int id) 
+    {
+        using var scope1 = scopeFactory.CreateScope();
+        using var scope2 = scopeFactory.CreateScope();
+
+        varw db1 = scope1.ServiceProvider.GetSerivce1<AppDbContext>();
+        varw db1 = scope2.ServiceProvider.GetSerivce2<AppDbContext>();
+
+        var usersTask = db1.User.toListAsync();
+        var ordersTask = db2.Orders.toListAsync();
+
+        await Task.whenAll(usersTask, ordersTask);
+
+        /*var users = usersTask.Result; 
+        var orders = ordersTask.Result;
+
+        return (users, orders);*/
+
+        return (await usersTask, await ordersTask)
+    }
+}
+```
+
+- shared ORM session across threads is unsafe

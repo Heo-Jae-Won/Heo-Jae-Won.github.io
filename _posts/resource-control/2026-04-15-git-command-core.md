@@ -4,66 +4,15 @@ published: true
 categories: [resource-control]
 ---
 
-
-
 ## <span style="color:#802548">_git rebase miss caution_</span>
 
 - if u want to pull rebase, then dont need to fetch - rebase
 - just pull with rebase option is enough
 
 ```shell
-git pull origin develop --rebase -->O
+git pull origin develop --rebase -p --autostash -->O
+git pull origin/develop --rebase -p --autostash-->X
 ```
-
-- rebase command can cause a problem
-- pull commnad make a space between remote and branch
-- but rebase doesnt, so it would produce uninteded actions
-
-```shell
-git rebase origin develop --rebase  #-->X
-git rebase origin/develop           #-->O
-```
-
-
-## <span style="color:#802548">_how to view git stash content_</span>
-
-```
-***how to see content of git stash
-```
-
-```
-if stash pop error happens, stash pop doesnt drop stash.
-it is preserved in stash list still
-if u doing stash, first message should be WIP
-```
-
-```
-git fsck --lost-found
-git show <commit hash>
-```
-
-```
-what is git stash show -p stash@{0} ??
-```
-
-
-
-```
-if u want alias column like
-select 
-count(*) AS TOTAL_COUNT
-
-
-then in C#, just writing that alias column as a column name is enough
-[Column("TOTAL_COUNT")]
-public int? TotalCount {get, set};
-```
-
-
-- == can be overrided in C#
-- so, if u want to compare with null, always use is null or is not null in modern C#
-
-
 
 
 ## <span style="color:#802548">_clone branch_</span>
@@ -79,7 +28,7 @@ git clone -branch <branchname>  <remote-repo-url>
 - move to there after clone
 
 ```shell
-git fetch origin
+git fetch origin --prune
 git branch -r   
 git switch [remote branch]
 ```
@@ -90,72 +39,69 @@ git switch [remote branch]
 
 ```shell
 git fetch origin --prune
-git branch -d [branch] 
+git push origin [branch이름] --delete
+git branch -D [branch이름] 
 ```
 
-## <span style="color:#802548">_when do git pull with my branch remote_</span>
+## <span style="color:#802548">_merge build error fix commit to original service logic_</span>
+
+- suppose that i commited 2 different things
+    - build error fix
+    - service logic
+- order is service -> build error
+
+```
+72a1    fix build error
+392c    service logic
+```
+
+- but i conclude that fix build error commit is not needed
+- then do rebase and fixup
+
+```sh
+git rebase -i HEAD~2
+```
+
+- then below window is displayed
 
 ```shell
-git pull --rebase --autostash
-## if error happens, rather to use merge
-git rebase --abort
-git pull
+pick 392c service logic
+pick 72a1 fix build error
 ```
+
+- leave what u want to preserve
+- in this case, i decided to preserve 392c
+
+```shell
+pick 392c
+fixup 72a1
+```
+
+- then, build error fix commit's content is merged into 392c, which is service logic commit
+- to ensure build error fix commit is merged, git log
+
+```shell
+392c service logic
+```
+
 
 ## <span style="color:#802548">_when do git force push, rejected_</span>
 [rejected] branch -> branch(stale info) ---> this occurs cuz u pushed another commit from another PC.
             so u need to reset hard and pull ur own bracnh.
 
-## <span style="color:#802548">_when do git pull with dev remote_</span>
-
-```shell
-git pull origin dev --rebase --autostash
-## if error happens, rather to use merge
-git rebase --abort
-git pull
-```
-
-## <span style="color:#802548">_branch manipulation_</span>
-- make new branch and move
-- delete remote and local branch both
-- rename branch 
-- see default branch
-
-```shell
-git switch -c [branch]
-
-git push origin --delete [branch이름]
-
-git branch -m [current branch] [future branch name]
-
-git remote show origin
-```
-
-
-## <span style="color:#802548">_branch repulishing when divergence wrong_</span>
-
-```shell
-git branch -d [branch name]
-git push origin --delete [branch이름]
-
-git switch [branch that should be origin]
-git switch -c [new featrue branch]
-```
-
 ## <span style="color:#802548">_remove local change_</span>
 
-- remove local change tracked
+- remove local change tracked and untracked both
 
 ```shell
-git restore [filename]
+git restore .
+git clean -fdx
 ```
 
-- remove local change untracked
-- at first, check that file is really untracked then clean it
+- removing all staged file
 
 ```shell
-git status --ignored
-git clean -fdnx
+git restore --staged .
 ```
 
 ## <span style="color:#802548">_stash untracked and staged_</span>
@@ -164,71 +110,6 @@ git clean -fdnx
 git stash push -u -m "message"
 ```
 
-
-## <span style="color:#802548">_remove staged file from staging area_</span>
-
-- removing all staged file
-
-```shell
-git restore --staged .
-```
-
-## <span style="color:#802548">_add file to just before commit when not yet pushed_</span>
-
-- no need to increase commit for adding file
-
-```shell
-git add [file]
-git commit --amend -m "message" # or git commit --amend  
-```
-
-- basically, commit --amend rewrites commit history
-- so if u already pushed it, u need to push it force
-
-```shell
-git push --force-with-lease
-```
-
-## <span style="color:#802548">_when u want to do experiment about bugs using completely different branch_</span>
-
-```shell
-git stash push -m "my work before fixing a bug"
-
-git switch -c fix/feature
-
-git add .
-git commit -m "implement fix"
-
-git fetch origin
-git rebase origin/main
-
-git push -u origin fix/feature
-
-# open GitHub PR (fix/feature → main)
-
-git switch main
-git branch -d fix/feature
-
-git stash drop stash@{0}   # only if you still have stash left
-```
-
-- simplified version that dont use rebase
-
-```shell
-git switch main
-git pull
-git switch -c fix/feature
-
-# work + commit
-git add .
-git commit -m "fix bug"
-
-git push -u origin fix/feature
-# open PR
-
-git switch main
-git branch -d fix/feature
-```
 
 ## <span style="color:#802548">_git command customizing_</span>
 
@@ -265,14 +146,6 @@ alias.ll=log --pretty=format:%C(yellow)%h%Cred%d\ %Creset%s%Cblue\ [%cn] --decor
 
 ```
 
-
-## <span style="color:#802548">_seeing previous commit content_</span>
-
-```shell
-git checkout [commithash] 
-
-git switch -
-```
 
 ## <span style="color:#802548">_HEAD~ and HEAD^ diff for merge commit_</span>
 
@@ -326,140 +199,17 @@ git commit -m "final combined work"
 github PR
 ```
 
-## <span style="color:#802548">_rebase：replacing cherry pick_</span>
-
-- above one can be replaced by rebase
-- but it must be cautious that rebase must be done in local commit, not pushed one
-
-```shell
-git rebase -i rtqwrr51^
-```
-
-- text would be shown like below
-
-```shell
-pick rtqwrr51
-pick abc123 --->squash
-pick def456 --->squash
-pick cdef21 --->squash
-git commit --amend -m "Implement feature X (final version)" # (if message editor doesnt open)
-git push # (if already published --force-with-lease)
-```
-
-- if it's already published in remote, teammates should do following one whether it's used on my own or shared
-
-```shell
-git fetch
-git rebase origin/mybranch
-```
-
-## <span style="color:#802548">_git conflict on branch when using git pull_</span>
-
-```shell
-# fixing content
-git add [fixed file]
-git merge --continue
-```
-
-- structure would be like below
-
-```sh
-M = merge commit (newly created)
-D is NOT rewritten
-X → Y is NOT rewritten
-Git combines both histories
-
-
-A --- B --- C --- D              ---> this is merged version
-              \       \
-               X --- Y --- M
-```
-
-## <span style="color:#802548">_rebase：fix local commit message before publishing to remote_</span>
-
-```shell
-git rebase -i HEAD~n :
-pick -> reword 
-change commit message -> :wq
-```
-
-
-## <span style="color:#802548">_rebase：PR_</span>
-
-- in my feature branch is executed
-- only for local commit
-
-```shell
-git fetch origin
-git rebase -i origin/dev #(if target is main, origin/main)
-```
-
-- if conflicts happens
-- after rebase, already aligned commit. so it becoms fast forward --> clean history
-
-```shell
-git add
-git rebase --continue
-git push origin feature/my-work
-open PR → feature → dev 
-```
-
-- basic form of rebase is like below
-    - it means  Git will rebase branch onto upstream
-- but latter one is used often
-    - it means "Take the current branch (HEAD) and replay its commits on top of origin/dev."
-
-```shell
-git rebase <upstream(origin/dev)> <branch(feature/login)>
-
-git rebase origin/dev
-```
-
-- so two combination is usally used for rebasing
-
-```shell
-git switch feature/branch
-git rebase origin/dev
-```
-
 ## <span style="color:#802548">_reflog：showing history for git conduct_</span>
 
 - HEAD in reflog doesnt mean branch's head
     - therefore, HEAD@{0} and HEAD@{2} can be actually refer to same thing
-- reflog show command can limit target of command like below
 
 ```shell
-git reflog show HEAD@{2.days.ago}
-git reflog show HEAD@{1.month.ago}
-git reflog show HEAD@{1.week.ago}
-git reflog show master@{0} master@{yesterday}
+git reflog
+git reset --hard [commit hash that i want to get back]
 ```
 
 
-
-## <span style="color:#802548">_reflog：restore file_</span>
-- git reflog show --> finding a commit hash that i need to recover
-- after restoring, file is recreated in working directory, not inside Git history
-- so need to again add and commit
-
-```shell
-git log --all -- '*file*'
-    commit 8f3a91c2d7b5a4c1e9a0f2b6c7d8e9f1a2b3c4d5
-git ls-tree -r <commit-hash>
-    100644 blob aaa111 src/app/main.py
-    100644 blob bbb222 src/utils/helper.py
-git restore --source <commit> <file-path>
-```
-
-## <span style="color:#802548">_temp save_</span>
-
-- we can save our work to temp space
-- but untracked file cannot be target of stash
-
-```shell
-git stash push -m "my work before fixing a bug"
-git stash pop
-```
 
 ## <span style="color:#802548">_revert：commit delete from remote repo_</span>
 
