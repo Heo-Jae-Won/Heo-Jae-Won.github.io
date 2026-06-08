@@ -7,7 +7,7 @@ categories: [lang]
 
 
 ## <span style="color:#802548">고차함수로 loop statement 대체하기</span>
-- 반복분에는 for문과 while문이 있다.
+- 반복문에는 for문과 while문이 있다.
 - 자주 쓰게 되는 것은 for문이다.
 
 ```javascript

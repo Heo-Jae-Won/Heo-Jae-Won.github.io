@@ -16,13 +16,13 @@ git pull origin/develop --rebase -p --autostash-->X
 
 ## <span style="color:#802548">_how can i know where my branch is from_</span>
 
-- if u are not sure which branch is ur original branch, below is recommended
+- if u are not sure which branch is ur original branch, below is recommended, when u use merge
 - but the problem is that, it shows commit even if my branch is from develop/AService
     - cuz develop/AService is from develop
     - but dont worry. if ur branch is from develop, then git merge-base --fork-point [develop/AService] doesnt show commit
 
 ```shell
-git merge-base --fork-point [develop/AService]
+git merge-base --fork-point [develop-AService]
 git merge-base --fork-point [develop]
 ```
 
@@ -32,9 +32,9 @@ git merge-base --fork-point [develop]
 ```text
 develop          o---o---A---B---C (develop keeps moving)
                          \
-develop/AService          X---Y---Z (AService split from A)
+develop-AService          X---Y---Z (AService split from A)
                                    \
-your-branch                         1---2 (You split from Z)
+feature-your-branch                  1---2 (You split from Z)
 ```
 
 - if ur branch is from develop, u can see C commit
@@ -42,12 +42,50 @@ your-branch                         1---2 (You split from Z)
 ```text
 develop          o---o---A---B---C (develop keeps moving)
                                    \
-your-branch                         1---2 (You split from C)
+feature-your-branch                  1---2 (You split from C)
 ```
 
+- if u using rebase policy, we cannot know where branch is originated from with merge-base command
+- only reflog can rescue us
+
+```shell
+git reflog show [my_feature_branch] 
 ```
-git show-branch
+
+- u can see branch:Created from message
+- and in left side u can see where your branch is originated from
+    - in this case, develop/AService
+
 ```
+.
+.
+.
+.
+commithash (develop/AService) my_service@{n} : branch: Created from HEAD
+```
+
+
+- but if your branch is created in remote branch by git UI, then u cannot know
+- cuz there is no history in git reflog
+
+
+## <span style="color:#802548">_case insensitive warning_</span>
+- if u see this kinda error message when fetching, u need to check which branchs are almost same
+
+```text
+error, You're on a case-insensitive filesystem, and the remote you are trying to fetch from has references that only differ in casing
+```
+
+- like below u can type typo
+- in this case, u need to leave new one and delete old one
+- if Uppercase has newer commit, then let Featrue/Aservice live
+- if undercase has newer commit, then let featrue/Aservice live
+
+```
+feature/AService
+Feature/ASerivce
+```
+
 
 ## <span style="color:#802548">_update remote branch_</span>
 
@@ -176,6 +214,29 @@ alias.ll=log --pretty=format:%C(yellow)%h%Cred%d\ %Creset%s%Cblue\ [%cn] --decor
 .
 .
 
+```
+
+## <span style="color:#802548">_git vim alias usage_</span>
+
+- file path can be retrieved with git command 
+```shell
+git log --name-only --author=HeoJaeWon --date-local --since=\"2026-04-10\" | egrep -v '^commit | ^Date: | ^Merge: | ^Author: |
+^\\s' | sort | uniq
+```
+
+- but, in vimconfig, we cannot not use that form, cuz vim is not shell script
+- so u must wrap it with 
+
+```shell
+git fp = "!git log --name-only --author=HeoJaeWon --date-local --since=\"2026-04-10\" | egrep -v '^commit | ^Date: | ^Merge: | ^Author: |
+^\\s' | sort | uniq" 
+# file with path
+
+git fp = "!git log --name-only --pretty=format: --author=HeoJaeWon --since=\"2026-04-10\" | grep -v '^$' | xargs -n1 basename | sort -u" 
+# file name
+
+git ffc = "!f() {git log --name-only --pretty: --grep=\"$1\" --author='HeoJaeWon' --since='2026-04-10' | grep -v '^$' | xagrs -n1 basename | sort -u; }; f";
+# give file name as a variable
 ```
 
 
