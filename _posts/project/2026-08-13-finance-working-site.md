@@ -1473,50 +1473,171 @@ foreach (var item in List)
 - but problem is that, above one has a serious problem in one or nothing ACID
 - so for one or nothing transaction, we need chunk process toward temp table
 - and if it fails, delete all recorded
-- if all chunk process success, then now insert all things to original table
+- if all chunk process success, then now insert with chunk to original table
+- using DELETE TOP (@ChunkSize) is very helpful
 
 ```C#
-Guid currentBatchId = Guid.NewGuid();
+using System;
+using System.Data;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 
-try
+public class BatchProcessorEF
 {
-    // STAGE 1: Fast, safe, chunked insertion into the Staging Table
-    foreach (var chunk in chunksOf4900)
+    private readonly MyDbContext _context;
+
+    public BatchProcessorEF(MyDbContext context)
     {
-        using (var transaction = context.Database.BeginTransaction())
-        {
-            foreach(var item in chunk) { item.BatchId = currentBatchId; }
-            
-            context.StagingItems.AddRange(chunk);
-            context.SaveChanges();
-            transaction.Commit(); // 💥 Frees locks from RAM instantly!
-        }
-        context.ChangeTracker.Clear();
+        _context = context;
     }
 
-    // STAGE 2: Atomic, all-or-nothing move to the Live production table
-    using (var liveTransaction = context.Database.BeginTransaction())
+    public void ExecuteSafeBatchEF(DataTable validatedData)
     {
-        await context.Database.ExecuteSqlRawAsync(@"
-            INSERT INTO LiveItems (Name, Status)
-            SELECT Name, 'Processed' 
-            FROM StagingItems 
-            WHERE BatchId = {0}", currentBatchId);
+        // 1. Manually extract and open the underlying connection to preserve the Temp Table session
+        var connection = (SqlConnection)_context.Database.GetDbConnection();
+        
+        if (connection.State != ConnectionState.Open)
+        {
+            connection.Open();
+        }
 
-        await context.Database.ExecuteSqlRawAsync(
-            "DELETE FROM StagingItems WHERE BatchId = {0}", currentBatchId);
+        // ==========================================================
+        // PHASE 1: Create Temp Table and Stream Data (Fast Bulk Insert)
+        // ==========================================================
+        
+        // Create the staging schema using EF Core Raw SQL execution
+        _context.Database.ExecuteSqlRaw(@"
+            CREATE TABLE #BatchStaging (
+                UserID INT NOT NULL,
+                OrderAmount DECIMAL(18,2) NOT NULL,
+                OrderDate DATETIME NOT NULL
+            );
+        ");
 
-        liveTransaction.Commit();
+        // Use SqlBulkCopy for hyper-fast network streaming into the sandbox
+        using (var bulkCopy = new SqlBulkCopy(connection))
+        {
+            bulkCopy.DestinationTableName = "#BatchStaging";
+            bulkCopy.BulkCopyTimeout = 60;
+            bulkCopy.WriteToServer(validatedData);
+        }
+
+        // ==========================================================
+        // PHASE 2: Localized Chunk Loop (Under 5,000 Rows per Statement)
+        // ==========================================================
+        
+        int chunkSize = 2500; // Strictly under the 5,000 lock escalation limit
+        int rowsProcessed = 1;
+        int totalMoved = 0;
+
+        Console.WriteLine("Starting safe EF Core data migration loop...");
+
+        // Loop until #BatchStaging is empty
+        while (rowsProcessed > 0)
+        {
+            try
+            {
+                // We use an OUTPUT parameter to capture @@ROWCOUNT back into C#
+                var rowsProcessedParam = new SqlParameter
+                {
+                    ParameterName = "@RowsProcessed",
+                    SqlDbType = SqlDbType.Int,
+                    Direction = ParameterDirection.Output
+                };
+
+                var chunkSizeParam = new SqlParameter("@ChunkSize", chunkSize);
+
+                // Execute a single isolated micro-transaction statement via EF Core
+                _context.Database.ExecuteSqlRaw(@"
+                    BEGIN TRANSACTION;
+                    BEGIN TRY
+                        DELETE TOP (@ChunkSize) 
+                        FROM #BatchStaging
+                        OUTPUT 
+                            DELETED.UserID, 
+                            DELETED.OrderAmount, 
+                            DELETED.OrderDate
+                        INTO ProductionOrders (UserID, OrderAmount, OrderDate);
+
+                        SET @RowsProcessed = @@ROWCOUNT;
+                        COMMIT TRANSACTION;
+                    END TRY
+                    BEGIN CATCH
+                        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+                        THROW;
+                    END CATCH;
+                ", chunkSizeParam, rowsProcessedParam);
+
+                // Read the output parameter value
+                rowsProcessed = (int)rowsProcessedParam.Value;
+                totalMoved += rowsProcessed;
+
+                if (rowsProcessed > 0)
+                {
+                    Console.WriteLine($"Successfully moved chunk of {rowsProcessed} rows. Total moved: {totalMoved}");
+                }
+            }
+            catch (SqlException ex)
+            {
+                // AUTOMATIC RETRACKING:
+                // Previous loops are already COMMITTED in production.
+                // The failed or un-processed rows are safe in #BatchStaging.
+                Console.WriteLine($"[EF CRITICAL FAILURE] Migration stopped due to DB error: {ex.Message}");
+                Console.WriteLine($"The batch failed after completing {totalMoved} rows.");
+                throw;
+            }
+        }
+
+        Console.WriteLine($"EF Core Migration complete. Fully migrated {totalMoved} rows without lock escalation.");
+        
+        // Note: Do not close the connection manually if your DbContext lifecycle manages it, 
+        // but when the context disposes, the connection closes and drops #BatchStaging automatically.
     }
 }
-catch (Exception ex)
+```
+
+- but main thing is that, if falis, we must consider how to deal wit hauto-generated identity column
+    - web orders, logs, or comments doesnt care order. so identity column is totally fine
+    -  financial accounting ledgers or tax invoicing should follow order. so identity column is not fine
+- #BatchStaging is destroyed when application server crusehd
+    - so, over retry count, in try catch, we must record remaining rows in Error Log/Dead-Letter Table
+    - or Physical Staging Table like Staging_Orders is needed
+
+```C#
+int maxAppRetries = 3;
+int retryCount = 0;
+bool success = false;
+
+while (!success && retryCount < maxAppRetries)
 {
-    _logger.LogError(ex, "Processing failed. Cleaning up staging data.");
-    
-    await context.Database.ExecuteSqlRawAsync(
-        "DELETE FROM StagingItems WHERE BatchId = {0}", currentBatchId);
-    
-    throw;
+    try
+    {
+        // Run your Phase 2 C# chunking loop here
+        ExecuteChunkingLoop(connection);
+        success = true; 
+    }
+    catch (SqlException)
+    {
+        retryCount++;
+        if (retryCount >= maxAppRetries)
+        {
+            Console.WriteLine("[CRITICAL] Max retries reached. Moving leftovers to dead-letter table...");
+            
+            // AUTOMATIC SALVAGE: Move all remaining rows out of the fragile temp table
+            // and save them to a permanent table for manual inspection/re-run.
+            connection.Execute(@"
+                INSERT INTO FailedBatchRecords (BatchID, UserID, OrderAmount, OrderDate, ErrorLogTime)
+                SELECT @BatchID, UserID, OrderAmount, OrderDate, GETDATE()
+                FROM #BatchStaging;
+            ", new { BatchID = currentBatchId });
+
+            // Now it is safe to let the connection close and the temp table drop.
+            throw new Exception("Batch processing failed permanently. Leftovers preserved in FailedBatchRecords.");
+        }
+        
+        // Wait before retrying (exponential backoff)
+        System.Threading.Thread.Sleep(2000 * retryCount); 
+    }
 }
 ```
 
