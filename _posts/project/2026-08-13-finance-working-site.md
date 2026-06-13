@@ -1126,7 +1126,6 @@ _.update(entity.RowVersion);
 
 - reading csv file data
 
-
 ```C#
 public class TestUtil {
     public static IList<T> ReadDataFromCsv<T>(string filepath) 
@@ -1382,3 +1381,316 @@ change_date <= '2025-07-13' (Range / Inequality)
 CREATE INDEX idx_entity_lookup 
 ON entity (code, isDeleted, change_date DESC);
 ```
+
+
+
+## <span style="color:#802548">_efficient sql usage2_</span>
+
+- 페이지 IO 차이??
+
+## <span style="color:#802548">_chunk process batch_</span>
+- using chunk for batching is needed
+- chunk must be processed in each respective transaction
+- for utilizing chunk process merit, followed one is bad practice
+
+```C#
+using (var scope = new TransactionScope(
+    TransactionScopeOption.Required, 
+    new TransactionOptions { IsolationLevel = IsolationLevel.ReadCommitted },
+    TransactionScopeAsyncFlowOption.Enabled))
+{
+    foreach (var chunk in chunksOf4900)
+    {
+        context.MyTable.AddRange(chunk);
+        context.SaveChanges(); 
+    }
+    transaction.Commit(); 
+}
+```
+
+- this is needed
+- transaction must be executed in foreach statement
+
+```C#
+foreach (var chunk in chunksOf4900)
+{
+    using (var scope = new TransactionScope(
+        TransactionScopeOption.Required, 
+        new TransactionOptions { IsolationLevel = IsolationLevel.ReadCommitted },
+        TransactionScopeAsyncFlowOption.Enabled))
+    {
+        context.MyTable.AddRange(chunk);
+        context.SaveChanges(); // Writes to database
+        
+        transaction.Commit(); // 💥 Instantly frees the 4,900 locks from SQL Server RAM!
+    }
+    
+    // Crucial for EF Core: Clears C# tracking memory so your app doesn't slow down
+    context.ChangeTracker.Clear(); 
+}
+```
+
+- this is more complexed example
+    - after inserting, saveChanges()
+    - after updating, saveChanges()
+- why execute SaveChanges() for each DML?
+    - cuz it free early memory taken up by DML
+
+```C#
+// Loop through your data list
+foreach (var item in List)
+{
+    // Open a fresh micro-transaction for this specific item/chunk
+    using (var scope = new TransactionScope(
+        TransactionScopeOption.Required, 
+        new TransactionOptions { IsolationLevel = IsolationLevel.ReadCommitted },
+        TransactionScopeAsyncFlowOption.Enabled))
+    {
+        try
+        {
+            _serviceA.Insert(item);
+            context.SaveChanges(); // Pushes insert to DB (holds temporary tiny lock)
+
+            _serviceA.Update(item);
+            context.SaveChanges(); 
+
+            transaction.Commit(); // 💥 Instantly frees the locks from SQL Server RAM!
+        }
+        catch (Exception ex)
+        {
+            // 4. IF EITHER FAILS, rollback this specific item's insert and update completely
+            transaction.Rollback(); 
+            
+            
+            throw;
+        }
+    }
+
+    context.ChangeTracker.Clear();
+}
+```
+
+- but problem is that, above one has a serious problem in one or nothing ACID
+- so for one or nothing transaction, we need chunk process toward temp table
+- and if it fails, delete all recorded
+- if all chunk process success, then now insert all things to original table
+
+```C#
+Guid currentBatchId = Guid.NewGuid();
+
+try
+{
+    // STAGE 1: Fast, safe, chunked insertion into the Staging Table
+    foreach (var chunk in chunksOf4900)
+    {
+        using (var transaction = context.Database.BeginTransaction())
+        {
+            foreach(var item in chunk) { item.BatchId = currentBatchId; }
+            
+            context.StagingItems.AddRange(chunk);
+            context.SaveChanges();
+            transaction.Commit(); // 💥 Frees locks from RAM instantly!
+        }
+        context.ChangeTracker.Clear();
+    }
+
+    // STAGE 2: Atomic, all-or-nothing move to the Live production table
+    using (var liveTransaction = context.Database.BeginTransaction())
+    {
+        await context.Database.ExecuteSqlRawAsync(@"
+            INSERT INTO LiveItems (Name, Status)
+            SELECT Name, 'Processed' 
+            FROM StagingItems 
+            WHERE BatchId = {0}", currentBatchId);
+
+        await context.Database.ExecuteSqlRawAsync(
+            "DELETE FROM StagingItems WHERE BatchId = {0}", currentBatchId);
+
+        liveTransaction.Commit();
+    }
+}
+catch (Exception ex)
+{
+    _logger.LogError(ex, "Processing failed. Cleaning up staging data.");
+    
+    await context.Database.ExecuteSqlRawAsync(
+        "DELETE FROM StagingItems WHERE BatchId = {0}", currentBatchId);
+    
+    throw;
+}
+```
+
+- for second thing to consider is transaction scope
+- if in that service also has BeginTransaction, then orchestrator pattern is needed
+
+```C#
+// The loop manages the single active transaction scope
+foreach (var item in List)
+{
+    using (var transaction = context.Database.BeginTransaction()) // ONE transaction
+    {
+        try
+        {
+            _serviceA.Insert(item); // Runs seamlessly inside the transaction
+            _serviceA.Update(item); // Runs seamlessly inside the transaction
+
+            transaction.Commit();   // Commits BOTH. Instantly frees RAM locks!
+        }
+        catch
+        {
+            transaction.Rollback(); // Rolls back BOTH safely!
+            throw;
+        }
+    }
+    context.ChangeTracker.Clear();
+}
+```
+
+- if u cannot, TransactionScope is needed
+- it's like @Transactional in Spring
+- Transaction Propagation
+    - Spring detects the existing transaction, skips creating a new one, and forces the inner method to seamlessly join the outer one
+
+```C#
+using System.Transactions; // Required namespace
+
+foreach (var item in List)
+{
+    // Outer Scope: Enforces that EVERYTHING inside rolls back together
+    using (var outerScope = new TransactionScope(TransactionScopeOption.Required))
+    {
+        try
+        {
+            // Even if Insert() has an internal transaction, TransactionScope 
+            // intercepts it and suppresses the EF Core nesting error!
+            _serviceA.Insert(item); 
+            _serviceA.Update(item); 
+
+            outerScope.Complete(); // Commits everything at once and frees RAM
+        }
+        catch
+        {
+            // Auto-rolls back both steps if an exception occurs
+            throw; 
+        }
+    }
+    context.ChangeTracker.Clear();
+}
+```
+
+- for async/await, TransactionScope can lose track of the transaction
+- pass TransactionScopeAsyncFlowOption.Enabled 
+
+```C#
+using (var scope = new TransactionScope(
+    TransactionScopeOption.Required, 
+    new TransactionOptions { IsolationLevel = IsolationLevel.ReadCommitted },
+    TransactionScopeAsyncFlowOption.Enabled))
+{
+    await _context.SaveChangesAsync();
+    scope.Complete();
+}
+```
+
+
+## <span style="color:#802548">_efficient sql usage3_</span>
+
+- 
+
+```sql
+select U.* from
+(
+    VALUES(1,20),(3,40)
+) V (USER_ID, AGE)
+JOIN USERS U 
+    ON U.USER_ID = V.USER_ID
+    AND U.AGE = V.AGE
+```
+
+
+
+
+## <span style="color:#802548">_BeginTransaction problem in C# efcore_</span>
+
+
+- or Alternative 2: MediatR + Pipeline Behaviors (The Modern C# Architectural Standard)
+
+```C#
+public class TransactionBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+{
+    private readonly MyDbContext _context;
+    public TransactionBehavior(MyDbContext context) => _context = context;
+
+    public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
+    {
+        // Automatically injects a transaction wrapper around any command handlers!
+        using var transaction = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            var response = await next(); // Executes your actual service logic
+            await transaction.CommitAsync();
+            return response;
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+    }
+}
+```
+
+ [ Web Request ] 
+        │
+        ▼
+ 1. CONTROLLER ────────► Simply receives the HTTP request and sends a command packet.
+        │
+        ▼
+ 2. PIPELINE BEHAVIOR ─► Intercepts the packet, automatically calls `.BeginTransactionAsync()`.
+        │
+        ▼
+ 3. SERVICE HANDLER ───► Executes your Insert() and Update() code (100% clean of transaction logic).
+        │
+        ▼
+ 2. PIPELINE BEHAVIOR ─► Detects success, automatically calls `.CommitAsync()`, and frees SQL Server locks!
+        │
+        ▼
+ [ HTTP Response ]
+
+
+```C#
+[ApiController]
+[Route("api/items")]
+public class ItemsController : ControllerBase
+{
+    private readonly IMediator _mediator;
+    public ItemsController(IMediator mediator) => _mediator = mediator;
+
+    [HttpPost]
+    public async Task<IActionResult> Process([FromBody] ProcessItemCommand command)
+    {
+        // The controller just passes the data to MediatR and forgets about it.
+        var result = await _mediator.Send(command);
+        return Ok(result);
+    }
+}
+```
+
+```C#
+public class ProcessItemCommandHandler : IRequestHandler<ProcessItemCommand, bool>
+{
+    private readonly ServiceA _serviceA;
+    public ProcessItemCommandHandler(ServiceA serviceA) => _serviceA = serviceA;
+
+    public async Task<bool> Handle(ProcessItemCommand request, CancellationToken cancellationToken)
+    {
+        // 100% focused on business rules. No try/catch loops. No commit/rollback calls.
+        // If anything fails here, Layer 2 will catch it and roll back automatically.
+        await _serviceA.InsertAsync(request.Item);
+        await _serviceA.UpdateAsync(request.Item);
+        
+        return true; 
+    }
+}
+```
+
