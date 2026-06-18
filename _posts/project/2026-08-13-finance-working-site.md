@@ -1162,77 +1162,539 @@ public class TestUtil {
 }
 ```
 
-## <span style="color:#802548">_C# dbcontext : scoped_</span>
+## <span style="color:#802548">_C# dbcontext : shared, concurrency, parellism_</span>
 - DBcontext is basically scoped
-    - scoped means new instance for every request.0
+    - scoped means new instance for every request
 - if not scoped, there would be some serious problems
-- when dbContext is not scoped, they share same dbcontext
-- and it will cause problems even repoo doesnt touch shared object
-- cuz DbContext is not thread-safe, so state in dbContext would be corrupted
+    - when dbContext is not scoped, they share same dbcontext
+    - and it will cause problems even repo doesnt touch shared object
+- cuz DbContext is shared through all requests, so state in dbContext would be corrupted
     - both attempts tracker and identity map dictionary 
+    - select doesnt work at all
 
-```C#
-await Task.WhenAll(
-    repo.GetUserAsync(1),
-    repo.GetUserAsync(2),
-)
+- if u want to make a request-safe DbContext, use AddDbContext()
+
+```
+services.AddSingleton() --> request-shared, let alone not thread-safe
+services.AddDbContext() --> creates one scoped instance per request= request-safe, but not thread-safe yet
 ```
 
-- buf even if scoped, above code is dangerous
+- buf even if scoped, above code could be dangerous if u use parellism programming
+- AddDbContext can prevent standard multi-user concurrency, but cannot prevent parallelism inside a single request
+    - cuz it's not thread-safe at all
+
+```
+                       /---> Thread 1 (Query Users) ---\
+Request 1 (User A) ---|                                 |---> Same DbContext Instance A (CRASH!)
+                       \---> Thread 2 (Query Orders) ---/
+```
+
+
+- DbContext can only have one active database operation at a time per instance
+    -  dbcontext wraps only single connection 
+    -  Change Tracker is based on dictionary but it's not a ConcurrentDictionary
+        - concurrency DML causes race conditions, memory corruption, and undefined behavior
+        - .net core throws InvalidOperationException when concurrency problem happens
+
 
 
 
 - right form of pararellism is like below
-- not dbContext, but IDbContextFactory in repo
+    - IDbContextFactory is needed, not dbContext
+    - IDbContextFactory creates different dbcontext for each thread and destroy temp dbcontext
+    - but that means that, after destroying dbconetxt, u cannot track enttiy
+    - cuz entity existed on already destroyed dbcontext. context1.SaveChanges() doesnt work at all
+    - therefore, it's for read-only data
 
 ```C#
-public class UserRepository : IUserRepository
+using Microsoft.EntityFrameworkCore;
+
+public class UserService 
 {
     private readonly IDbContextFactory<AppDbContext> _contextFactory;
 
-    public UserRepository(IDbContextFactory<AppDbContext> contextFactory)
+    public UserService(IDbContextFactory<AppDbContext> contextFactory)
     {
         _contextFactory = contextFactory;
     }
 
-    public async Task<User> GetUserAsync(int id)
+    public async Task<(List<User> Users, List<Order> Orders)> GetUserAsync(int id) 
     {
-        using var context = await _contextFactory.CreateDbContextAsync();
-        return await context.Users.FindAsync(id);
+        using var context1 = await _contextFactory.CreateDbContextAsync();
+        using var context2 = await _contextFactory.CreateDbContextAsync();
+
+        var usersTask = context1.Users.Where(u => u.Id == id).ToListAsync();
+        var ordersTask = context2.Orders.Where(o => o.UserId == id).ToListAsync();
+
+        await Task.WhenAll(usersTask, ordersTask);
+
+        return (await usersTask, await ordersTask);
     }
 }
 ```
 
-- this is service logic
+
+
+
+## <span style="color:#802548">_C# dbcontext : tranasction in dbcontext, shared context with TransactionScope_</span>
+- transaction is based on DbContext
+- ib same dbContext, nested transaction cannot work if transaction is not scoped
 
 ```C#
-public class UserSerivce 
-{
-    public async Task<(List<User> Users, List<Order> Orders)> getUserAsync(int id) 
+// serviceD
+using var tranasction = _context.Database.BeginTransaction();
+
+try {
+  _repoA.updateB
+
+  _serviceA.updateD
+
+  _repoC.updateC
+
+  _serviceB.insertA
+} catch() {
+  rollback
+}
+
+// serviceA
+using var tranasction = _context.Database.BeginTransaction();
+
+try {
+
+} catch() {
+    rollback
+} 
+```
+
+
+- we can see followed error with above code
+
+```
+"The connection is already in a transaction and cannot participate in another transaction."
+```
+
+
+- so may some team write this kind of code
+- to avoid connection error caused by nested transaction, always return new dbContext
+
+```C#
+public class serviceA() {
+    private readonly DbContext _context;
+
+
+    public serviceA() {
+        _context = createNewDbContext();
+    }
+    
+}
+
+//content
+createNewDbContext() {
+    return new DbContext(options);
+}
+```
+
+- but what if _serviceA has own transaction?
+- then in transaction from serviceD is executed in dbContextA
+- while transaction from serviceA is executed in dbContextB
+- even if serviceA fails, serviceD's _repoA cannot be rollbacked
+
+```C#
+// serviceD
+using var tranasction = _context.Database.BeginTransaction();
+
+try {
+  _repoA.updateB
+
+  _serviceA.updateD
+
+  _repoC.updateC
+
+  _serviceB.insertA
+} catch() {
+  rollback
+}
+
+// serviceA
+using var tranasction = _context.Database.BeginTransaction();
+
+try {
+
+} catch() {
+    rollback
+} 
+```
+
+- we can use scopreTransaction() with shared dbContext created by addDbContext, not returning new for each transaction
+- scope.Complete() is very important
+- it sends a signal to efcore that transaction is over successfully, so outer transaction is over, efcore sends commit command
+
+```C#
+public class ServiceA() {
+    private readonly MyDbContext _context; 
+
+    public ServiceA(MyDbContext context)
     {
-        using var scope1 = scopeFactory.CreateScope();
-        using var scope2 = scopeFactory.CreateScope();
+        _context = context;
+    }
 
-        varw db1 = scope1.ServiceProvider.GetSerivce1<AppDbContext>();
-        varw db1 = scope2.ServiceProvider.GetSerivce2<AppDbContext>();
+    using (var scope = new TransactionScope())
+    {
+        await _context.SaveChangesAsync();
+        scope.Complete(); 
+    }
+}
 
-        var usersTask = db1.User.toListAsync();
-        var ordersTask = db2.Orders.toListAsync();
+```
+- TransactionScope can join outer tranasction
 
-        await Task.whenAll(usersTask, ordersTask);
+```
+[ Thread / Async Flow ]
+       |
+       +---> TransactionScope #1 (Outer: Required)  <--- Creates Ambient Transaction (ID: 001)
+                 |
+                 +---> _repoA.updateB()             <--- Joins Ambient Transaction 001
+                 |
+                 +---> TransactionScope #2 (Inner)  <--- Detects ID 001, hooks into it
+                           |
+                           +---> _serviceA.updateD() <--- Joins Ambient Transaction 001
+```
 
-        /*var users = usersTask.Result; 
-        var orders = ordersTask.Result;
 
-        return (users, orders);*/
+- for async-await, we must insert TransactionScopeAsyncFlowOption.Enabled option
 
-        return (await usersTask, await ordersTask)
+```C#
+using (var scope = new TransactionScope(
+    TransactionScopeOption.Required, 
+    new TransactionOptions { IsolationLevel = IsolationLevel.ReadCommitted },
+    TransactionScopeAsyncFlowOption.Enabled))
+{
+    await _context.SaveChangesAsync();
+    scope.Complete(); // important for sending a signal to efcore that transaction is over successfully
+}
+```
+
+- but writing TransactionScope and try catch has so many code boilerplate
+- so, making TransactionManager can help a lot
+
+```C#
+using System;
+using System.Transactions;
+using System.Threading.Tasks;
+
+public class TransactionManager
+{
+    // Notice: We don't even need MyDbContext injected here! 
+    // TransactionScope handles the ambient tracking automatically.
+    public async Task ExecuteAsync(Func<Task> action)
+    {
+        using var scope = new TransactionScope(
+            TransactionScopeOption.Required, // ◄ Automatically Joins an outer transaction if it exists!
+            new TransactionOptions { IsolationLevel = IsolationLevel.ReadCommitted },
+            TransactionScopeAsyncFlowOption.Enabled // ◄ Keeps it thread-safe across async/await calls
+        );
+
+        try
+        {
+            await action(); // Runs your business logic
+            
+            scope.Complete(); // ◄ Votes "Yes" to commit.
+        }
+        catch
+        {
+            // Leaving the block without calling Complete() triggers an automatic rollback
+            throw; 
+        }
     }
 }
 ```
 
-- shared ORM session across threads is unsafe
+- service logic's boilerplate would be decreesed
 
+```C#
+public class OrderService
+{
+    private readonly TransactionManager _txManager;
+    private readonly InventoryService _inventory;
+    private readonly BillingService _billing;
+
+    public OrderService(TransactionManager txManager, InventoryService inv, BillingService bill)
+    {
+        _txManager = txManager;
+        _inventory = inv;
+        _billing = bill;
+    }
+
+    public async Task CreateOrderAsync()
+    {
+        await _txManager.ExecuteAsync(async () => 
+        {
+            await _inventory.StockCheckAsync();
+            await _billing.ChargeCardAsync();
+        });
+    }
+
+    public async Task CancelSubscriptionAsync()
+    {
+        await _txManager.ExecuteAsync(async () => 
+        {
+            await _membership.DeactivateAsync();
+            await _email.SendGoodbyeAsync();
+        });
+    }
+}
+```
+
+## <span style="color:#802548">_C# dbcontext : tranasction in dbcontext, Orchestration pattern_</span>
+
+- there is other option that u can consider except for shared dbcontext with transactionscope
+- that is Orchestration pattern
+- Business-Level Orchestration could be implemented easily
+- just collecting all service into one big class
+- Low class boilerplate, but High transaction boilerplate
+
+```C#
+public class OrderOrchestrator 
+{
+    private readonly MyDbContext _context;
+    private readonly ServiceA _serviceA;
+    private readonly ServiceB _serviceB;
+
+    public async Task RunWorkflowAsync() 
+    {
+        // The business service ITSELF must explicitly know about and manage the transaction
+        using var tx = await _context.Database.BeginTransactionAsync();   // boilerplate
+        try {                                                             // boilerplate
+            await _serviceA.UpdateDAsync();
+            await _serviceB.InsertAAsync();
+            await tx.CommitAsync();
+        } catch {                                                         // boilerplate
+            await tx.RollbackAsync();                                     // boilerplate
+        }                                                                 // boilerplate
+    }
+}
+```
+
+- MediatR + Pipeline Behaviors (The Modern C# Architectural Standard)
+- Zero transaction boilerplate, but High class/file boilerplate
+
+- flow is like below
+
+```
+ [ Web Request ] 
+        │
+        ▼
+ 1. CONTROLLER ────────► Simply receives the HTTP request and sends a command packet.
+        │
+        ▼
+ 2. PIPELINE BEHAVIOR ─► Intercepts the packet, automatically calls `.BeginTransactionAsync()`.
+        │
+        ▼
+ 3. SERVICE HANDLER ───► Executes your Insert() and Update() code (100% clean of transaction logic).
+        │
+        ▼
+ 2. PIPELINE BEHAVIOR ─► Detects success, automatically calls `.CommitAsync()`, and frees SQL Server locks!
+        │
+        ▼
+ [ HTTP Response ]
+```
+
+- CONTROLLER sourecode is followed one
+- service is subsituted by Mediator
+
+```C#
+using MediatR;
+using Microsoft.AspNetCore.Mvc;
+using System.Threading.Tasks;
+
+public record CreateProductCommand(string Name, decimal Price) : ICommand<int>;
+
+[ApiController]
+[Route("api/products")]
+public class ProductsController : ControllerBase
+{
+    private readonly IMediator _mediator;
+
+    public ProductsController(IMediator mediator) => _mediator = mediator;
+
+    [HttpPost]
+    public async Task<IActionResult> CreateProduct([FromBody] CreateProductCommand command)
+    {
+        // Simply sends the packet down the pipeline
+        int productId = await _mediator.Send(command);
+        return Ok(productId);
+    }
+}
+```
+
+- this is pipeline behaviour
+- pipeline handles transaction only
+- real db operation is executed by service handler
+
+```C#
+using MediatR;
+using Microsoft.EntityFrameworkCore;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+
+public class TransactionBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+    where TRequest : ICommand<TResponse> // ◄ Ensures this ONLY runs for transactional commands
+{
+    private readonly DbContext _context;
+
+    public TransactionBehavior(DbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<TResponse> Handle(
+        TRequest request, 
+        RequestHandlerDelegate<TResponse> next, 
+        CancellationToken cancellationToken)
+    {
+        // 1. Automatically begin the transaction on the shared Scoped connection
+        using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        
+        try
+        {
+            // 2. Hand off execution to the actual Service Handler (Step 3)
+            var response = await next();
+
+            // 3. If no exceptions occurred, commit everything and free database locks
+            await transaction.CommitAsync(cancellationToken);
+            
+            return response;
+        }
+        catch (Exception)
+        {
+            // 4. Automatically rollback all database changes if anything fails
+            await transaction.RollbackAsync(cancellationToken);
+            throw; // Rethrow to let the global exception handler manage the HTTP response
+        }
+    }
+}
+```
+
+- this is service handler
+- this is responsible for db action
+
+```C#
+using MediatR;
+using System.Threading;
+using System.Threading.Tasks;
+
+public class CreateProductHandler : IRequestHandler<CreateProductCommand, int>
+{
+    private readonly DbContext _context; // Shared Scoped instance injected automatically
+
+    public CreateProductHandler(DbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<int> Handle(CreateProductCommand request, CancellationToken cancellationToken)
+    {
+        var product = new Product 
+        { 
+            Name = request.Name, 
+            Price = request.Price 
+        };
+
+        // Standard EF Core insert action
+        await _context.Set<Product>().AddAsync(product, cancellationToken);
+        
+        // Push to database tracking engine. 
+        // This is safely isolated because the pipeline holds an uncommitted transaction channel!
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return product.Id;
+    }
+}
+```
+
+
+- this is registering
+
+```C#
+using MediatR;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddControllers();
+
+// 1. Add your standard DbContext (Defaults to Scoped Lifetime)
+builder.Services.AddDbContext<DbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// 2. Add MediatR and register your TransactionBehavior
+builder.Services.AddMediatR(cfg => {
+    cfg.RegisterServicesFromAssembly(typeof(Program).Assembly);
+    
+    // Register the middleware pipeline behavior
+    cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(TransactionBehavior<,>));
+});
+
+var app = builder.Build();
+
+app.MapControllers();
+app.Run();
+```
+
+
+## <span style="color:#802548">_C# dbcontext : tranasctionscope in multiple dbcontext_</span>
+
+- but what if case is about multiple dbcontext?
+    - Connecting to Completely Different Databases
+        - AppDbContext -> high-speed PostgreSQL cluster for core transactions 
+        - AuditLogDbContext -> an Azure SQL database for compliance storage
+    - Implementing a Microservices Pattern (Bounded Contexts)
+        - a single massive database is divided into logical sections called "Bounded Contexts."
+        - OrderingContext or InventoryContext
+    - Separation of Reads and Writes (CQRS Architecture)
+        - WriteDbContext -> This context handles data creation, updates, and deletions
+        - ReadDbContext -> pulling data to display on screens or web UIs
+    - Multi-Threaded or Parallel Processing Tasks
+        - usually IDbContextFactory is used
+
+
+- cuz we use TransactionScope, multiple DbContext shares TransactionScope
+
+```
+┌────────────────────────────────────────────────────────┐
+│            TransactionScope (1 Single Scope)           │
+│                                                        │
+│  ┌──────────────────┐          ┌──────────────────┐    │
+│  │   DbContext A    │          │   DbContext B    │    │
+│  │ (Connection #1)  │          │ (Connection #2)  │    │
+│  └────────┬─────────┘          └────────┬─────────┘    │
+└───────────┼─────────────────────────────┼──────────────┘
+            ▼                             ▼
+   [ DB Server #1 ]              [ DB Server #2 ]
+```
+
+- but the problem is that, .NET needs a distributed transaction(MSDTC)
+- MSDTC has a good thing 
+    - MSDTC prevent partial commit
+    - can be used for not only SQL server but also meesage queue, in all distributed tranasction
+- the bad thing about MSDTC is like followed
+    - overhead cuz of two-phase commit 
+        - more network communication, more loggin, more coodrination work
+        - operational complexity like monitoring MSDTC, configuratin MSDTC
+        - trouble shooting would be difficult - sql server logs, msdtc logs, network ssettings, firewall settings
+        - not fittable for cloud-native
+
+
+
+## <span style="color:#802548">_Java and C# : what is different from @Transactional in Spring and Transaction in efcore ?_</span>
+- why @Tranasctional is all things needed for Spring, but efcore must consider a lot of things?
+    - proxy ? 
+
+
+## <span style="color:#802548">_C# dbcontext : how TransactionScope can detect outer transaction and join transactions_</span>
 
 
 ## <span style="color:#802548">_efficient sql usage_</span>
@@ -1384,9 +1846,6 @@ ON entity (code, isDeleted, change_date DESC);
 
 
 
-## <span style="color:#802548">_efficient sql usage2_</span>
-
-- 페이지 IO 차이??
 
 ## <span style="color:#802548">_chunk process batch_</span>
 - using chunk for batching is needed
@@ -1727,91 +2186,3 @@ JOIN USERS U
     ON U.USER_ID = V.USER_ID
     AND U.AGE = V.AGE
 ```
-
-
-
-
-## <span style="color:#802548">_BeginTransaction problem in C# efcore_</span>
-
-
-- or Alternative 2: MediatR + Pipeline Behaviors (The Modern C# Architectural Standard)
-
-```C#
-public class TransactionBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
-{
-    private readonly MyDbContext _context;
-    public TransactionBehavior(MyDbContext context) => _context = context;
-
-    public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
-    {
-        // Automatically injects a transaction wrapper around any command handlers!
-        using var transaction = await _context.Database.BeginTransactionAsync();
-        try
-        {
-            var response = await next(); // Executes your actual service logic
-            await transaction.CommitAsync();
-            return response;
-        }
-        catch
-        {
-            await transaction.RollbackAsync();
-            throw;
-        }
-    }
-}
-```
-
- [ Web Request ] 
-        │
-        ▼
- 1. CONTROLLER ────────► Simply receives the HTTP request and sends a command packet.
-        │
-        ▼
- 2. PIPELINE BEHAVIOR ─► Intercepts the packet, automatically calls `.BeginTransactionAsync()`.
-        │
-        ▼
- 3. SERVICE HANDLER ───► Executes your Insert() and Update() code (100% clean of transaction logic).
-        │
-        ▼
- 2. PIPELINE BEHAVIOR ─► Detects success, automatically calls `.CommitAsync()`, and frees SQL Server locks!
-        │
-        ▼
- [ HTTP Response ]
-
-
-```C#
-[ApiController]
-[Route("api/items")]
-public class ItemsController : ControllerBase
-{
-    private readonly IMediator _mediator;
-    public ItemsController(IMediator mediator) => _mediator = mediator;
-
-    [HttpPost]
-    public async Task<IActionResult> Process([FromBody] ProcessItemCommand command)
-    {
-        // The controller just passes the data to MediatR and forgets about it.
-        var result = await _mediator.Send(command);
-        return Ok(result);
-    }
-}
-```
-
-```C#
-public class ProcessItemCommandHandler : IRequestHandler<ProcessItemCommand, bool>
-{
-    private readonly ServiceA _serviceA;
-    public ProcessItemCommandHandler(ServiceA serviceA) => _serviceA = serviceA;
-
-    public async Task<bool> Handle(ProcessItemCommand request, CancellationToken cancellationToken)
-    {
-        // 100% focused on business rules. No try/catch loops. No commit/rollback calls.
-        // If anything fails here, Layer 2 will catch it and roll back automatically.
-        await _serviceA.InsertAsync(request.Item);
-        await _serviceA.UpdateAsync(request.Item);
-        
-        return true; 
-    }
-}
-```
-
