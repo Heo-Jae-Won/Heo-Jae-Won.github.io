@@ -1300,13 +1300,13 @@ createNewDbContext() {
 - even if serviceA fails, serviceD's _repoA cannot be rollbacked
 
 ```C#
-// serviceD
+// outer
 using var tranasction = _context.Database.BeginTransaction();
 
 try {
   _repoA.updateB
 
-  _serviceA.updateD
+  _inner.updateD
 
   _repoC.updateC
 
@@ -1315,7 +1315,7 @@ try {
   rollback
 }
 
-// serviceA
+// inner
 using var tranasction = _context.Database.BeginTransaction();
 
 try {
@@ -1325,7 +1325,30 @@ try {
 } 
 ```
 
-- we can use scopreTransaction() with shared dbContext created by addDbContext, not returning new for each transaction
+- so i add throw exception logic to guarantee that outer transaction can rollback
+- it is not enough
+    - there is some blank time that concurrent user can see data with no integrity
+        - if time between outer to inner transaction is long, then maybe user can see almost 5 seconds wrong data 
+        - therefore, wrong request based on that wrong data.
+    - no way to catch outer --> inner exception in terms of inner
+        - so, even if outer throws exception, inner's transaaction cannot be rollbacked
+        - cuz inner is alreday commited and there is no way to access already processed inner code
+
+```C#
+// inner
+using var tranasction = _context.Database.BeginTransaction();
+
+try {
+
+} catch() {
+    rollback
+    throw 
+} 
+```
+
+
+- to avoid this kind of problems, we can use scopreTransaction() with shared dbContext created by addDbContext
+    - do not  return new dbcontext for each transaction
 - scope.Complete() is very important
 - it sends a signal to efcore that transaction is over successfully, so outer transaction is over, efcore sends commit command
 
@@ -1346,6 +1369,7 @@ public class ServiceA() {
 }
 
 ```
+
 - TransactionScope can join outer tranasction
 
 ```
