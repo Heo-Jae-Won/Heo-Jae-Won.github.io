@@ -704,7 +704,7 @@ WHERE change_history_order = final_change_history_order
 
 
 - rank over() always needs order by so always needs sort operation
-
+- when u need to rank correctly, then use dense_rank
 
 ```sql
 SELECT equipment_no, change_date, change_history_order
