@@ -94,6 +94,9 @@ func main() {
 ```go
 func (q *Queue[T]) resize(newCapacity int) {
     newElements := make([]T, newCapacity)
+    //numbers := []int{10, 20, 30} 
+    // var sourceArray [100]int 
+    // newElements := sourceArray[:newCapacity] 
 
     // Copy in correct order starting from head
     for i := 0; i < q.size; i++ {
@@ -116,8 +119,8 @@ func (q *Queue[T]) Push(e T) bool {
     }
 
     q.elements[q.tail] = e
-    q.tail = (q.tail + 1) % len(q.elements)
     q.size++
+    q.tail = (q.tail + 1) % len(q.elements)
     return true
 }
 
@@ -139,8 +142,8 @@ func (q *Queue[T]) Poll() (T, bool) {
 
     result := q.elements[q.head]
     q.elements[q.head] = zero
-    q.head = (q.head + 1) % len(q.elements)
     q.size--
+    q.head = (q.head + 1) % len(q.elements)
 
     q.shrinkIfNeeded()
 

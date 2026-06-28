@@ -99,6 +99,48 @@ func ReturnNewReverseArray(arr []int) []int {
 }
 ```
 
+- 半分にするのは、以下のようなロジックでも問題なく可能
+
+```java
+public class Main {
+    public static String reverseManual(String str) {
+        char[] chars = str.toCharArray();
+        int left = 0;
+        int right = chars.length - 1;
+        
+        while (left < right) {
+            char temp = chars[left];
+            chars[left] = chars[right];
+            chars[right] = temp;
+            left++;
+            right--;
+        }
+        return new String(chars);
+    }
+}
+```
+
+- for 文だと、以下のように変数を2つ利用する形
+
+```java
+public class Main {
+    public static String reverseManual(String str) {
+        if (str == null) return null;
+        
+        char[] chars = str.toCharArray();
+        
+        for (int left = 0, right = chars.length - 1; left < right; left++, right--) {
+            char temp = chars[left];
+            chars[left] = chars[right];
+            chars[right] = temp;
+        }
+        
+        return new String(chars);
+    }
+}
+
+```
+
 ## <span style="color:#802548">_実装ー選択ソート昇順_</span>
 
 - 選択ソート昇順
