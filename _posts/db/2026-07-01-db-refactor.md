@@ -1028,3 +1028,66 @@ FROM RankedPopups
 -- Discard any records exceeding the threshold restriction ceiling
 WHERE row_num <= 5;
 ```
+
+
+
+## <span style="color:#802548">_どうやって同じ内容をマージするのか_</span>
+- UNION ALLを使ってマージする
+- 案内ポップアップと特権ポップアップがあるとして、それが別々のテーブルの内容になっている
+- ただし、7日以内のものとじゃないものを区別して見せたい場合、Whereでしてしまうと、該当する内容のみ取得してしまう
+- そのため、Case-Whenを利用し、FlagColumnをくっつけてBackend側に転送する
+
+```sql
+SELECT
+    DECODE(new_ds, 1, 'guidance', 2, 'privilege') AS new_nm,
+    sub.*
+FROM
+    (
+        SELECT
+            '1' AS new_ds,
+            bbrd_sqno AS new_id,
+            CASE
+                WHEN (TO_CHAR(SYSDATE, 'yyyymmdd') - TO_CHAR(TO_DATE(rg_dtm, 'yyyymmddhh24miss'), 'yyyymmdd')) <= 7 THEN 'y'
+                ELSE 'n'
+            END AS new_yn
+        FROM
+            (
+                SELECT
+                    rg_dtm,
+                    bbrd_sqno
+                FROM
+                    board
+                WHERE
+                    bltn_yn = 'y'
+                    AND TO_CHAR(SYSDATE, 'yyyymmddhh24miss') <= ed_dtm
+                ORDER BY
+                    rg_dtm DESC NULLS LAST
+            )
+        WHERE
+            ROWNUM <= 1
+
+        UNION ALL
+
+        SELECT
+            '2' AS new_ds,
+            bbrd_sqno AS new_id,
+            CASE
+                WHEN (TO_CHAR(SYSDATE, 'yyyymmdd') - TO_CHAR(TO_DATE(req_dtm, 'yyyymmddhh24miss'), 'yyyymmdd')) <= 7 THEN 'y'
+                ELSE 'n'
+            END AS new_yn
+        FROM
+            (
+                SELECT
+                    req_dtm
+                FROM
+                    push
+                WHERE
+                    cusno = '10'
+                    AND del_yn = 'n'
+                ORDER BY
+                    req_dtm DESC NULLS LAST
+            )
+        WHERE
+            ROWNUM <= 1
+    ) sub;
+```
