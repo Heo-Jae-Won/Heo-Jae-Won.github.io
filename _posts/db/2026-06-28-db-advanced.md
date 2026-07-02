@@ -308,16 +308,6 @@ WHERE SALES_CLASSIFICATION = 'A'
 AND SALES_MONTH BETWEEN '201801' AND '201812'
 ```
 
-- in practice, there is a condition where having the non-leading column serve as an index filter yields better performance
-- if index is (customer_no, commodity_type_code), then modifying not leading columns can be a choice
-
-```sql
-SELECT *
-FROM purchased_commoditiy_user
-WHERE customer_no = :cust_no
-AND commodity_no || '' in ('NH00037', 'NH00041','NH00050')
-```
-
 ## <span style="color:#802548">_index skip scan_</span>
 - for reducing index scan, u can use index skip scan either
 - index skip scan
@@ -581,20 +571,36 @@ ORDER BY APPLICATION_DATE, DATA_ENTRY_USER
 ```
 
 
-- but for that strategy to work, in clause must not be resolved as a index access
-- for example, index consists of (RESIDENCE, BLOOD_TYPE, AGE)
-    - BLOOD_TYPE has a high cardinality
-    - and BLOOD_TYPE in A, O both is not well sorted even if index works
-- in this case, u need to change index to (RESIDENCE, AGE, BLOOD_TYPE)
-- then, order by opeartion is skipped and index filter works cuz BLOOD_TYPE is in index field
+- look at this query
 
 ```sql
 SELECT customer_no, customer_name, RESIDENCE
 FROM customer
-WHERE RESIDENCE = '서울'
+WHERE RESIDENCE = 'seoul'
 AND BLOOD_TYPE IN ('A','O')
 ORDER BY AGE
 ```
+
+- for example, index consists of (RESIDENCE, BLOOD_TYPE, AGE)
+    - BLOOD_TYPE in A, O both is not well sorted because of in operator even if index works
+- in this case, changing index to (RESIDENCE, AGE, BLOOD_TYPE) could be better choice
+  - it's up to sort vs scan
+  - (RESIDENCE, BLOOD_TYPE, AGE) with 50% scan- if A,O has 50% + sort vs (RESIDENCE, AGE, BLOOD_TYPE) with 100% scan + no sort
+  - if query has stop key condition like limit 10, then (RESIDENCE, AGE, BLOOD_TYPE) is better
+  - but if not, generally (RESIDENCE, BLOOD_TYPE, AGE) is better
+    - even if disjoint ranges happens because of in operator, so order by doesnt play a role in sorting data, reducing scan range is important when table access is needed
+
+```text
+A
+  age 18
+  age 20
+  age 25
+
+O
+  age 17
+  age 21
+```
+
 
 - if u decide to generate index, important thing to consider is how often that is used
 - let's suppose these kind of queryies
@@ -899,8 +905,22 @@ AND c.final_order_amount >=20000
 - in build step, join column is used as a hash table key
 - creating hash map is executed on small table, cuz it's efficient
   - big hash table -> memory usage up
+    - The Smaller Table (Build Input): Fits easily into the CPU's fast cache (L1/L2/L3) or the private session memory area 
   - big hash table -> a lot of probed table access
+    - small table uses L3 Cache and big uses RAM 
+    - both uses random memory access but L3 cache takes less time than RAM
   - big has table -> in building, CPU cost up
+    - allocate millions memory pointers and hashing, and resolve millions of hash collisions
+
+```text
+| location       |    delay |
+| -------- | ------------: |
+| L1 Cache |         ~1 ns |
+| L2 Cache |       ~3–5 ns |
+| L3 Cache |     ~10–20 ns |
+| RAM      | ~60–100 ns over |
+```
+  
 - small table doesnt mean row count is small
 - when filtered result set size is small, that is small table
 
@@ -992,6 +1012,7 @@ end;
 ```
 
 - this is fast cuz sorted data itself play a role as a index with sequential scan
+  - with good index, it becomes more fast, but without index and big table, it's best choice
   - it's easy to find starting poin cuz it has order
   - if join fails, it just stops and go to other records
   - no latch requires so very fast
