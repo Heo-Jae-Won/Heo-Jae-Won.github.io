@@ -20,6 +20,7 @@ categories: [db-advanced]
     - going deep with root -> branch -> leaf block, found index key that satisfies condition
     - index is sorted so keep reading index record(key-value pair)
 - index leaf scan is totally different from data block scan
+
 - index leaf block doesnt read entire row
     - at first, finding starting point, which is vertical scan
     - finally, seeking all index leaf that satisfies where condition from starting ponit to end point, which is finding end point
@@ -959,7 +960,7 @@ WHERE final_order_amount >= 20000
 - in this case, latch is not needed for sorting, which means high performance
 - merge join's flow is like below
   - sort
-  - merge'
+  - merge
 
 ```sql
 SELECT /*+ ordered use_merge(c) */
@@ -1264,13 +1265,29 @@ WHERE p.data_entry_date >= trunc(add_months(sysdate, -3), 'mm')
   WHERE t.order_date >= sysdate - 7
   ```
 
+  - if u dont want to filter rows by that condition, use on clause
+
+  ```sql
+  FROM commodity p
+  LEFT JOIN order t ON t.commodity_no = p.commodity_no
+  on t.order_date >= sysdate - 7
+  ```
+
   - using driving table condition on clause (p.data_entry_date >=)
-  - left join doesnt filter rows, it fills data with null
+  - left join on cluase doesnt filter rows at all, it fills data with null
 
     ```sql
     FROM commodity p
     LEFT JOIN order t ON t.commodity_no = p.commodity_no
     AND p.data_entry_date >= ...
+    ```
+    
+    - correct one is using where when u want to filter rows from resultset
+
+    ```sql
+    FROM commodity p
+    LEFT JOIN order t ON t.commodity_no = p.commodity_no
+    where p.data_entry_date >= ...
     ```
 
 ## <span style="color:#802548">_inline view_</span>
@@ -1296,7 +1313,7 @@ LEFT JOIN order t
 ```
 
 - but in some case, we want to merge where condition to inline view
-- cuz to do that, we can even reduce more unneccesary rows
+- by doing that, we can even reduce more unneccesary rows
 - in terms of total sql, we should filter customer whether he is new or not
 - but inline view does not know it so just scan
 
@@ -1339,11 +1356,11 @@ AND t.customer_no = c.customer_no
 - but above hint is only in Oracle
 - in other db, scalar subquery was used
 - but scalar subquery has serious problem that it repeats duplicated read
-- below query scan is 4 scan
-  - customer 
-  - trnasction for avg
-  - transaction for min
-  - trnasction for max
+- below query scan is 3 times scan
+  - trnasction for avg of customer
+  - transaction for min of customer
+  - trnasction for max of customer
+- if customer count is 100,000 -> then 300,000
 
 ```sql
 SELECT c.customer_no, c.customer_name
@@ -1358,8 +1375,8 @@ WHERE c.entry_date >= trunc(add_months(sysdate, -1), 'mm')
 ```
 
 - so, LPAD with substr is better choice
-  - customer 
-  - transaction for avg, max, min
+  - transaction for avg, max, min of customer
+  - if customer count is 300,000 -> then 100,000
 
 ```sql
 SELECT customer_no, customer_name
@@ -1382,6 +1399,7 @@ FROM (
 - for both, push down is activated so no difference on that aspect
 - and if amount digit over 10, LPAD logic would break
 - so it's better to use LEFT JOIN LATERAL
+- but scan amount is same, 100,000
 
 ```sql
 SELECT c.customer_no, c.customer_name, 
@@ -1398,13 +1416,14 @@ LEFT JOIN LATERAL (
 WHERE c.entry_date >= TRUNC(ADD_MONTHS(SYSDATE, -1), 'mm');
 ```
 
-- but that doesnt prevent loop
+- to reduce scan amount, needs join, not LATERAL join
 - it means that when many customer is joined, random access during join would increase, which leads to performance disaster
 - in that case, simple left join with group by is better choice
   - and this is quite popular cuz it does not rely on hint and applicapable on all db
   - but if new customer actively perform transaction, then joined row would increase
 - so when joined driving table final records is very big, use simple left join
 - if driving table is small, then use LEFT JOIN LATERAL
+- scan amount is 100,000 -> 1 times
 
 ```sql
 SELECT c.customer_no, c.customer_name, 
@@ -1419,17 +1438,28 @@ WHERE c.entry_date >= trunc(add_months(sysdate, -1), 'mm')
 GROUP BY c.customer_no, c.customer_name;
 ```
 
+- for higher performance, aggregate probed table first in an inline view
+- transaction is concentrated on 1 customer_no(PK) 
+- modern db optimizes generally previous query using group-by pushdown but better to write readable sql
 
+```sql
+-- BEST CHOICE FOR LARGE DATASETS: Pre-aggregated Simple Join
+SELECT c.customer_no, c.customer_name, 
+       t.average_transaction, t.minimum_transaction, t.maximum_transaction
+FROM customer c
+LEFT JOIN (
+    -- Aggregate the transaction table FIRST to shrink it
+    SELECT customer_no,
+           AVG(transaction_count) average_transaction,
+           MIN(transaction_count) minimum_transaction, 
+           MAX(transaction_count) maximum_transaction
+    FROM transaction
+    WHERE transaction_date >= TRUNC(SYSDATE, 'mm')
+    GROUP BY customer_no
+) t ON t.customer_no = c.customer_no
+WHERE c.entry_date >= TRUNC(ADD_MONTHS(SYSDATE, -1), 'mm');
+```
 
-## <span style="color:#802548">_sort_</span>
-- if db needs sorted or modified columns, they use sort area
-- at first, mermoy if memory shortage happens, then disk
-  - sort merge join
-  - hash join
-  - group by
-  - order by
-
-<img src="/assets/sort-process.jpg" />
 
 ## <span style="color:#802548">_keyword that must avoid in sorting_</span>
 
