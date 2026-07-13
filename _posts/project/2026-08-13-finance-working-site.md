@@ -2210,3 +2210,9 @@ JOIN USERS U
     ON U.USER_ID = V.USER_ID
     AND U.AGE = V.AGE
 ```
+
+
+## <span style="color:#802548">_json deserialization_</span>
+- DateTiem -> string conversion, format is decieded by CultureInfo of .net
+- .net interpret os or thread environment variable, which is 'ja-jp'
+- default value is not 00:00:00, 

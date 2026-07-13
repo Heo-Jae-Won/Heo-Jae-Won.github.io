@@ -78,6 +78,78 @@ GROUP BY
     , d.ITEM_NAME
 ```
 
+- Join条件が重複しているため、消す
+
+
+```sql
+select 
+a.SEQUENCE_NO
+, a.FUND_CODE
+, a.UPDATE_DATE
+, a.TYPE
+, a.VALID_DATE
+, a.INTERNAL_NO
+, a.BALANCE
+, a.CANCELED
+, a.PROCESS_TIME
+, a.API_ID
+, a.ROW_VERSION
+, B.FUND_NAME
+, B.CURRENCY_CLASS
+, B.CURRENCY_CLASS_NAME
+, d.ITEM_NAME
+, SUM(e.CHANGE_AMOUNT) as additionalSum
+, SUM(f.CHANGE_AMOUNT) as cancelSum
+from
+    BALANCE_INFO a
+LEFT JOIN FUND b
+    on b.FUND_CODE = a.FUND_CODE
+    and b.START_DATE <= {basisDate}
+    and b.END_DATE >= {basisDate}
+    and b.DELETED = false
+    and b.APPROVED in ('1', '2', '3')
+LEFT JOIN CURRENCY_INFO c
+    on a.CURRENCY_CLASS = b.CURRENCY_CLASS
+    and c.START_DATE <= {basisDate}
+    and c.END_DATE <= {basisDate}
+    and c.DELETED = false
+    and b.APPROVED in ('1', '2', '3') -->消す
+LEFT JOIN CODE d
+    on d.CODE = 'A01'
+    and d.ITEM_CODE = a.CANCELED
+    and d.DELTEED = false
+LEFT JOIN CHANGE_INFO e
+    on e.FUND_CODE = a.FUND_CODE
+    and e.CHANGE_DATE = a.UPDATE_DATE
+    and e.DEPOSIT_AND_WITHDRAWN = '1'
+    and b.CANCELD = false --->b.~~~ columnを取得したいときはここで使うべき。ここになると、この条件を満たさない限り、e.~~~は取得されない
+    and b.APPROVED in ('1', '2', '3') -->消す
+LEFT JOIN CHANGE_INFO f
+    on f.FUND_CODE = a.FUND_CODE
+    and f.CHANGE_DATE = a.UPDATE_DATE
+    and f.DEPOSIT_AND_WITHDRAWN = '2'
+    and f.CANCELD = false
+    and f.APPROVED in ('1', '2', '3')
+WHERE a.REVOKED = false
+and a.UPDAET_DATE <= {basisDate}
+and VALID_DATE >= {basisDate}
+GROUP BY
+    a.SEQUENCE_NO
+    , a.FUND_CODE
+    , a.UPDATE_DATE
+    , a.TYPE
+    , a.VALID_DATE
+    , a.INTERNAL_NO
+    , a.BALANCE
+    , a.CANCELED
+    , a.PROCESS_TIME
+    , a.API_ID
+    , a.ROW_VERSION
+    , B.FUND_NAME
+    , B.CURRENCY_CLASS
+    , B.CURRENCY_CLASS_NAME
+    , d.ITEM_NAME
+```
 
 
 - CASEーWHENを利用し、JOINを１つに減らす
@@ -114,7 +186,6 @@ LEFT JOIN CURRENCY_INFO c
    AND c.START_DATE <= {basisDate}
    AND c.END_DATE >= {basisDate}
    AND c.DELETED = false
-   AND c.APPROVED IN ('1', '2', '3')
 LEFT JOIN CODE d
     ON d.CODE = 'A01'
    AND d.ITEM_CODE = a.CANCELED
@@ -1090,4 +1161,314 @@ FROM
         WHERE
             ROWNUM <= 1
     ) sub;
+```
+
+## <span style="color:#802548">_SQL共通化_</span>
+
+- 同じSQLがずっと繰り返されている様子
+
+```sql
+select 
+    mbh.SEQUENCE_NO,
+    mbh.HOLIDAY_DATE,
+    mbh.COUNTRY_CODE,
+    mbh.UN_LO_CODE,
+    mbh.CENTER_ID,
+    mbh.HOLIDAY_CLASS_DIVISION,
+    mbh.CURRENCY_CLASS_DIVISION,
+    mbh.FINANCIAL_CENTER_NAME,
+    mbh.HOLIDAY_EVENT_YEAR,
+    mbh.HOLIDAY_EVENT_YEAR,
+    mbh.HOLIDAY_EVENT_DAY,
+    mbh.HOLIDAY_EVENT_NAME,
+    mbh.ALL_HOLIDAY_DIVISION,
+    mbh.COMMENT,
+    mbh.GENERAL_PURPOSE_ITEM_1,
+    mbh.GENERAL_PURPOSE_ITEM_2,
+    mbh.GENERAL_PURPOSE_ITEM_3,
+    mbh.APPROVAL_STATUS_DIVISION,
+    mbh.DELETE_DIVISION,
+    mbh.INPUT_DIVISION,
+    mbh.REGIST_DATE_TIME,
+    mbh.REGISTER_ID,
+    mbh.REGIST_PROGRAM_ID,
+    mc_a.ITEM_NAME as APPROVAL_STATUS_DIVISION_NAME,
+    mc_h.ITEM_NAME as HOLIDAY_CLASS_DIVISION_NAME,
+    mc_ah.ITEM_NAME as ALL_HOLIDAY_DIVISION_NAME,
+    mc_i.ITEM_NAME as INPUT_DIVISION,
+    mc_d.ITEM_NAME as DELETE_DIVISION,
+    mu_r.USER_NAME as REGISTER_NAME,
+    mu_ra.USER_NAME as REGIST_APPROVER_NAME,
+    mu_u.USER_NAME as UPDAETER_NAME,
+    mu_ua.USER_NAME as UPDATE_APPROVER_NAME,
+    mu_d.USER_NAME as DELETER_NAME,
+    mu_da.USER_NAME as DELETE_APPROVER_NAME,
+    m_coutnry.COUNTRY_REGION_JAPANESE_NMAE,
+from MST_BANK_HOLIDAY mbh
+left join(
+    select * from MST_CODE
+    where DIVISION_CODE = '0' 
+    and DELETE_DIVISION = '0') mc_a
+on mc_a.ITEM_CODE = mbh.APPROVAL_STTATUS_DIVISION
+left join(
+        select * from MST_CODE
+    where DIVISION_CODE = '0' 
+    and DELETE_DIVISION = '0') mc_h
+on mc_h.ITEM_CODE = mbh.HOLIDAY_CLASS_DIVISION
+    left join(
+        select * from MST_CODE
+    where DIVISION_CODE = '0' 
+    and DELETE_DIVISION = '0') mc_ah
+on mc_ah.ITEM_CODE = mbh.ALL_HOLIDAY_DIVISION
+    left join(
+        select * from MST_CODE
+    where DIVISION_CODE = '0' 
+    and DELETE_DIVISION = '0') mc_i
+on mc_i.ITEM_CODE = mbh.INPUT_DIVISION
+    left join(
+        select * from MST_CODE
+    where DIVISION_CODE = '0' 
+    and DELETE_DIVISION = '0') mc_d
+on mc_d.ITEM_CODE = mbh.DELETE_DIVISION
+left join (
+    select * from MST_USER
+    where APPROVAL_STATUS_DIVISION in (
+        '0','1','4'
+    )) mu_r
+on mu_r.USER_CODE = mbh.REGISTER_ID
+and mu_r.APPLICATION_START_DATE <= mbh.REGIST_DATE_TIEM
+and mu_r.APPLIICATION_END_DATE >= mbh.REGIST_DATE_TIME
+left join(
+    select * from MST_USER
+    where APPROVAL_STATUS_DIVISION in (
+        '0','1','4'
+    )) mu_ra
+on mu_ra.USER_CODE = mbh.REGIST_APPROVER_ID
+and mu_ra.APPLICATION_START_DATE <= mbh.REGIST_APPROVAL_DATE_TIME
+and mu_ra.APPLICATION_END_DATE >= mbh.REGIST_APPROVAL_DATE_TIME
+left join(
+    select * from MST_USER
+    where APPROVAL_STATUS_DIVISION in (
+        '0','1','4'
+    )) mu_u
+on mu_u.USER_CODE = mbh.UPDATER_ID
+and mu_u.APPLICATION_START_DATE <= mbh.UPDATE_DATE_TIME
+and mu_u.APPLICATION_END_DATE >= mbh.UPDATE_DATE_TIME
+left join(
+    select * from MST_USER
+    where APPROVAL_STATUS_DIVISION in (
+        '0','1','4'
+    )) mu_ua
+on mu_ua.USER_CODE = mbh.UPDATER_APPROVER_ID
+and mu_ua.APPLICATION_START_DATE <= mbh.UPDATE_APPROVAL_DATE_TIME
+and mu_ua.APPLICATION_END_DATE >= mbh.UPDATE_APPROVAL_DATE_TIME
+left join(
+    select * from MST_USER
+    where APPROVAL_STATUS_DIVISION in (
+        '0','1','4'
+    )) mu_ua
+on mu_ua.USER_CODE = mbh.UPDATER_APPROVER_ID
+and mu_ua.APPLICATION_START_DATE <= mbh.UPDATE_APPROVAL_DATE_TIME
+and mu_ua.APPLICATION_END_DATE >= mbh.UPDATE_APPROVAL_DATE_TIME
+left join(
+    select * from MST_USER
+    where APPROVAL_STATUS_DIVISION in (
+        '0','1','4'
+    )) mu_d
+on mu_d.USER_CODE = mbh.DELETER_ID
+and mu_d.APPLICATION_START_DATE <= mbh.DELETE_DATE_TIME
+and mu_d.APPLICATION_END_DATE >= mbh.DELETE_DATE_TIME
+    left join(
+    select * from MST_USER
+    where APPROVAL_STATUS_DIVISION in (
+        '0','1','4'
+    )) mu_da
+on mu_da.USER_CODE = mbh.DELETER_APPROVAL_ID
+and mu_da.APPLICATION_START_DATE <= mbh.DELETE_APPROVAL_DATE_TIME
+and mu_da.APPLICATION_END_DATE >= mbh.DELETE_APPROVAL_DATE_TIME
+```
+
+- それで上のSQLを以下のようにSELECTCASEに変換しても効果はない
+- ないどころか、動作できなくなる
+- nested subqueryでは相関queryは動作しない
+- 似たようなJoinをしてるから、それを１つのScanにしようとする試みはできない
+- 各自が異なるOn条件で相関してるからだ
+
+```sql
+select mbh.SEQUENCE_NO,
+    mbh.HOLIDAY_DATE,
+    mbh.COUNTRY_CODE,
+    mbh.UN_LO_CODE,
+    mbh.CENTER_ID,
+    mbh.HOLIDAY_CLASS_DIVISION,
+    mbh.CURRENCY_CLASS_DIVISION,
+    mbh.FINANCIAL_CENTER_NAME,
+    mbh.HOLIDAY_EVENT_YEAR,
+    mbh.HOLIDAY_EVENT_YEAR,
+    mbh.HOLIDAY_EVENT_DAY,
+    mbh.HOLIDAY_EVENT_NAME,
+    mbh.ALL_HOLIDAY_DIVISION,
+    mbh.COMMENT,
+    mbh.GENERAL_PURPOSE_ITEM_1,
+    mbh.GENERAL_PURPOSE_ITEM_2,
+    mbh.GENERAL_PURPOSE_ITEM_3,
+    mbh.APPROVAL_STATUS_DIVISION,
+    mbh.DELETE_DIVISION,
+    mbh.INPUT_DIVISION,
+    mbh.REGIST_DATE_TIME,
+    mbh.REGISTER_ID,
+    mbh.REGIST_PROGRAM_ID,
+    mc.APPROVAL_STATUS_DIVISION_NAME,
+    mc.HOLIDAY_CLASS_DIVISION_NAME,
+    mc.ALL_HOLIDAY_DIVISION_NAME,
+    mc.INPUT_DIVISION,
+    mc.DELETE_DIVISION,
+    mu.REGISTER_NAME,
+    mu.REGIST_APPROVER_NAME,
+    mu.UPDAETER_NAME,
+    mu.UPDATE_APPROVER_NAME,
+    mu.DELETER_NAME,
+    mu.DELETE_APPROVER_NAME,
+    m_coutnry.COUNTRY_REGION_JAPANESE_NMAE,
+from MST_BANK_HOLIDAY mbh
+left join (
+    select 
+        case when(ITEM_CODE = mbh.APPROVAL_STTATUS_DIVISION) then ITEM_NAME ELSE null as APPROVAL_STATUS_DIVISION_NAME,
+        case when(ITEM_CODE = mbh.HOLIDAY_CLASS_DIVISION_NAME) then ITEM_NAME ELSE null as HOLIDAY_CLASS_DIVISION_NAME,
+        case when(ITEM_CODE = mbh.ALL_HOLIDAY_DIVISION_NAME) then ITEM_NAME ELSE null as ALL_HOLIDAY_DIVISION_NAME,
+        case when(ITEM_CODE = mbh.INPUT_DIVISION) then ITEM_NAME ELSE null as INPUT_DIVISION,
+        case when(ITEM_CODE = mbh.DELETE_DIVISION) then ITEM_NAME ELSE null as DELETE_DIVISION,
+        case when(ITEM_CODE = mbh.APPROVAL_STTATUS_DIVISION) then ITEM_NAME ELSE null as APPROVAL_STATUS_DIVISION_NAME,
+        case when(ITEM_CODE = mbh.APPROVAL_STTATUS_DIVISION) then ITEM_NAME ELSE null as APPROVAL_STATUS_DIVISION_NAME
+    from MST_CODE
+    where DIVISION_CODE = '0' 
+    and DELETE_DIVISION = '0'
+) mc
+left join (
+    select 
+    case when(USER_CODE = mbh.REGISTER_ID and APPLICATION_START_DATE =  mbh.REGIST_DATE_TIME and APPLIICATION_END_DATE >= mbh.REGIST_DATE_TIME) then USER_NAME ELSE NULL as REGISTER_NAME,
+    case when(USER_CODE = mbh.REGIST_APPROVER_ID and APPLICATION_START_DATE =  mbh.REGIST_APPROVAL_DATE_TIME and APPLIICATION_END_DATE >= mbh.REGIST_APPROVAL_DATE_TIME) then USER_NAME ELSE NULL as REGIST_APPROVER_NAME,
+    case when(USER_CODE = mbh.UPDATER_ID and APPLICATION_START_DATE =  mbh.UPDATE_DATE_TIME and APPLIICATION_END_DATE >= mbh.UPDATE_DATE_TIME) then USER_NAME ELSE NULL as UPDAETER_NAME,
+    case when(USER_CODE = mbh.UPDATER_APPROVER_ID and APPLICATION_START_DATE =  mbh.UPDATE_APPROVAL_DATE_TIME and APPLIICATION_END_DATE >= mbh.UPDATE_APPROVAL_DATE_TIME) then USER_NAME ELSE NULL as UPDATE_APPROVER_NAME,
+    case when(USER_CODE = mbh.DELETER_ID and APPLICATION_START_DATE =  mbh.DELETE_DATE_TIME and APPLIICATION_END_DATE >= mbh.DELETE_DATE_TIME) then USER_NAME ELSE NULL as DELETER_NAME,
+    case when(USER_CODE = mbh.DELETER_APPROVAL_ID and APPLICATION_START_DATE =  mbh.DELETE_APPROVAL_DATE_TIME and APPLIICATION_END_DATE >= mbh.DELETE_APPROVAL_DATE_TIME) then USER_NAME ELSE NULL as DELETE_APPROVER_NAME
+    from MST_USER
+    where APPROVAL_STATUS_DIVISION in (
+        '0','1','4'
+    )
+) mu
+```
+
+- 実際に元のSQLは以下のような動きが見える
+- NLjoinは一行づつに進めていくから、 mc_a.ITEM_CODE = mbh.APPROVAL_STTATUS_DIVISIONもコンスタントになるので、 mbh.APPROVAL_STTATUS_DIVISIONはmc_a.ITEM_CODE = '2'になる
+- そのため、driven tableのレコードが2つの場合、join resultsetは driving table rowの２倍になる
+- Joinごとに増えてしまう場合もある
+
+```text
+ORDER：100万件 ー＞ ORDER_DETAILとJoin：5件ー＞DELIVERY：3件ー＞PAYMENT_HISTORY：4件
+
+1,000,000ｘ５ｘ３ｘ４＝60,000,000
+```
+
+- なのでJoinの関係では、関係を見る必要がある
+- 1:1 ?　1:N ?　N:M で どっちなのか？をちゃんと見極める必要がある
+- Joinの性能は Joinの回数も重要だが、1:N JOINでResultSetが増えるのもチェックする問題
+- そのため、共通したSELECT文だけ切り出すが最善のRefactoringになる
+
+```sql
+WITH CODE_INFO AS (
+    SELECT *
+    FROM MST_CODE
+    WHERE DIVISION_CODE = '0'
+      AND DELETE_DIVISION = '0'
+),
+USER_INFO AS (
+    SELECT *
+    FROM MST_USER
+    WHERE APPROVAL_STATUS_DIVISION IN ('0', '1', '4')
+)
+
+SELECT
+    mbh.SEQUENCE_NO,
+    mbh.HOLIDAY_DATE,
+    mbh.COUNTRY_CODE,
+    mbh.UN_LO_CODE,
+    mbh.CENTER_ID,
+    mbh.HOLIDAY_CLASS_DIVISION,
+    mbh.CURRENCY_CLASS_DIVISION,
+    mbh.FINANCIAL_CENTER_NAME,
+    mbh.HOLIDAY_EVENT_YEAR,
+    mbh.HOLIDAY_EVENT_DAY,
+    mbh.HOLIDAY_EVENT_NAME,
+    mbh.ALL_HOLIDAY_DIVISION,
+    mbh.COMMENT,
+    mbh.GENERAL_PURPOSE_ITEM_1,
+    mbh.GENERAL_PURPOSE_ITEM_2,
+    mbh.GENERAL_PURPOSE_ITEM_3,
+    mbh.APPROVAL_STATUS_DIVISION,
+    mbh.DELETE_DIVISION,
+    mbh.INPUT_DIVISION,
+    mbh.REGIST_DATE_TIME,
+    mbh.REGISTER_ID,
+    mbh.REGIST_PROGRAM_ID,
+
+    mc_a.ITEM_NAME  AS APPROVAL_STATUS_DIVISION_NAME,
+    mc_h.ITEM_NAME  AS HOLIDAY_CLASS_DIVISION_NAME,
+    mc_ah.ITEM_NAME AS ALL_HOLIDAY_DIVISION_NAME,
+    mc_i.ITEM_NAME  AS INPUT_DIVISION_NAME,
+    mc_d.ITEM_NAME  AS DELETE_DIVISION_NAME,
+
+    mu_r.USER_NAME  AS REGISTER_NAME,
+    mu_ra.USER_NAME AS REGIST_APPROVER_NAME,
+    mu_u.USER_NAME  AS UPDATER_NAME,
+    mu_ua.USER_NAME AS UPDATE_APPROVER_NAME,
+    mu_d.USER_NAME  AS DELETER_NAME,
+    mu_da.USER_NAME AS DELETE_APPROVER_NAME
+
+FROM MST_BANK_HOLIDAY mbh
+
+LEFT JOIN CODE_INFO mc_a
+    ON mc_a.ITEM_CODE = mbh.APPROVAL_STATUS_DIVISION
+
+LEFT JOIN CODE_INFO mc_h
+    ON mc_h.ITEM_CODE = mbh.HOLIDAY_CLASS_DIVISION
+
+LEFT JOIN CODE_INFO mc_ah
+    ON mc_ah.ITEM_CODE = mbh.ALL_HOLIDAY_DIVISION
+
+LEFT JOIN CODE_INFO mc_i
+    ON mc_i.ITEM_CODE = mbh.INPUT_DIVISION
+
+LEFT JOIN CODE_INFO mc_d
+    ON mc_d.ITEM_CODE = mbh.DELETE_DIVISION
+
+LEFT JOIN USER_INFO mu_r
+    ON mu_r.USER_CODE = mbh.REGISTER_ID
+   AND mu_r.APPLICATION_START_DATE <= mbh.REGIST_DATE_TIME
+   AND mu_r.APPLICATION_END_DATE >= mbh.REGIST_DATE_TIME
+
+LEFT JOIN USER_INFO mu_ra
+    ON mu_ra.USER_CODE = mbh.REGIST_APPROVER_ID
+   AND mu_ra.APPLICATION_START_DATE <= mbh.REGIST_APPROVAL_DATE_TIME
+   AND mu_ra.APPLICATION_END_DATE >= mbh.REGIST_APPROVAL_DATE_TIME
+
+LEFT JOIN USER_INFO mu_u
+    ON mu_u.USER_CODE = mbh.UPDATER_ID
+   AND mu_u.APPLICATION_START_DATE <= mbh.UPDATE_DATE_TIME
+   AND mu_u.APPLICATION_END_DATE >= mbh.UPDATE_DATE_TIME
+
+LEFT JOIN USER_INFO mu_ua
+    ON mu_ua.USER_CODE = mbh.UPDATER_APPROVER_ID
+   AND mu_ua.APPLICATION_START_DATE <= mbh.UPDATE_APPROVAL_DATE_TIME
+   AND mu_ua.APPLICATION_END_DATE >= mbh.UPDATE_APPROVAL_DATE_TIME
+
+LEFT JOIN USER_INFO mu_d
+    ON mu_d.USER_CODE = mbh.DELETER_ID
+   AND mu_d.APPLICATION_START_DATE <= mbh.DELETE_DATE_TIME
+   AND mu_d.APPLICATION_END_DATE >= mbh.DELETE_DATE_TIME
+
+LEFT JOIN USER_INFO mu_da
+    ON mu_da.USER_CODE = mbh.DELETER_APPROVAL_ID
+   AND mu_da.APPLICATION_START_DATE <= mbh.DELETE_APPROVAL_DATE_TIME
+   AND mu_da.APPLICATION_END_DATE >= mbh.DELETE_APPROVAL_DATE_TIME;
 ```

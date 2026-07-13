@@ -398,7 +398,15 @@ AND transaction_date BETWEEN :trd_dt1 and :trd_dt2
 ## <span style="color:#802548">_another way of index filter: index-organized table(clustered index)_</span>
 
 - instead of adding a new index field column, using index-organized table can be option
-- in index-organized table, index leaf block is data block
+- Heap organized table uses unclustered-index
+  - it doesnt store data itself in index leaf page
+  - it stores only row id in index page, not data itself
+  - 
+- unlike HOT, IOT uses clustered index
+  - it means that, on based of clustered index column, data is stored in index leaf page and sorted
+    - IOT is fast when select sql has range scan or sort operation, cuz it's already sorted
+    - and there is no table lookup, cuz all data is stored in index leaf page so it always uses covered index
+    - but the problem is that, page split happens cuz data needs to be sorted
 
 ```sql
 create table_index_org_t (a number, b varchar(10) constraint index_org_t_pk primary key (a))
@@ -406,8 +414,7 @@ organization index;
 ```
 
 - in mysql or SQL server, table basically adopts clustered index, IOT
-- IOT stores actual data rows in index leaf nodes and sorted
-- so it uses sequential access according to index leaf node, not random access
+- so it uses sequential access according to index leaf node, not random access in logical view
 - this is best choice when insert pattern and select pattern is different
 - typical example is insert by date, select by PK
   - let's suppose that batch to calculate sales performance is performed by date
@@ -435,20 +442,42 @@ create table sales_performance (employee_no varchar2(5), regist_date varchar2(8)
 create index(employee_no, regist_date) in sales_performance
 ```
 
+- even though IOT has good select performance, it could be undergone by page split
+  - especially when data is inserted in the middle of data, to free up space, data page is split
+    - this accomodates disk I/O
+  - as page is split, physical data page shows not contiguous flow, but random
+    - so in physical view, sequential access is hindered and random access is executed even if it's covered index
+    - even though table lookup doesnt happen, random I/O when accessing to next index page would happen
+
+- for example, let's suppose CustomerName is index key
+- and data is inserted in regardless of alphabet order
+- then, DB seeks free space far away, which means Page Split
+- for that situation, index rebuild is needed
+
+```sql
+ALTER INDEX CL_Orders_Date_Customer ON Orders REBUILD;
+```
+
+- or u can adjust FILLFACTOR, free space
+  - generally 100
+  - 80-90 : if data is inserted often in regardless of clustered index column
+  - 50-70 : a large amount of update and insert event
+
+```sql
+CREATE CLUSTERED INDEX CL_Orders_CustomerName 
+ON Orders (CustomerName)
+WITH (FILLFACTOR = 80);
+```
 
 
-## <span style="color:#802548">_clusterd index vs non-clustered index_</span>
-- clustered index physically sorts and stores the rows of the table on disk
-  - so at the end of b-tree seek, u can find data row itself
-  - it means that, in real clsuterd index is almost table
-  - actually, clustered index use sequential I/O like table scan
-    - so if u scan big index range with clustered index, it consumes so many byte 2KB with 
-  - while non-clustered index find pointer to real actual data
-- only 1 clusterd index is allowed and usually that is PK
-  - data must be sorted in two different ways simultaneously is impossible, so it's only 1 
-- basically, order by, group by column or range scan column is included
-  - like (PK, date), (date, UK), (date, status, FK), (date, identtiy)
-- automatically, indexes except for clustered-index is non-clustered index
+## <span style="color:#802548">_another way of index filter: index-organized table(clustered index)_</span>
+
+- then why logical index page scan find phsycial index page ?
+- cuz they have a page header, which includes next, prev page pointer
+- 
+
+
+
 
 ## <span style="color:#802548">_index scan_</span>
 
@@ -2018,7 +2047,6 @@ partition by range(order_date) (
 
 
 ## <span style="color:#802548">_index partition_</span>
-- 인덱스 파티션은 3가지로 나뉜다.
 - local partitioned index
   - index is belonged to table partition
   - when table partition configuration is changed, no need for recreation of index
