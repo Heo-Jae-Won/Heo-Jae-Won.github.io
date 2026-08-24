@@ -75,7 +75,7 @@ decimal result = (a ?? 0m) + (b ?? 0m);
 
 ```C#
 //SQL mapper form
-WHERE c.status = 'ACTIVE'AND c.startDate >= {startDate}
+WHERE c.status = 'ACTIVE' AND c.startDate >= {startDate}
 
 
 // sQL ORM
@@ -2215,4 +2215,5 @@ JOIN USERS U
 ## <span style="color:#802548">_json deserialization_</span>
 - DateTiem -> string conversion, format is decieded by CultureInfo of .net
 - .net interpret os or thread environment variable, which is 'ja-jp'
-- default value is not 00:00:00, 
+- default value is not 00:00:00, but 0:00:00
+- so FormattableString is needed. that is appropriate answer
